@@ -49,6 +49,44 @@ Now, you can use this note data to train your neural network to generate music.
 
 You can use the Scripts/trainRnn.wls script to train your own simple 1-layer LSTM network for audio generation! 
 
+## Fast iteration workflow (CPU-friendly)
+
+If you are training on a smaller custom dataset (e.g. ~150 MIDI files) and do not have a GPU, start with shorter CPU runs and iterate quickly:
+
+- In `Scripts/trainRnn.wls`, set `TargetDevice -> "CPU"`
+- Reduce `TimeGoal` from 12 hours to a small first pass (30-90 minutes)
+- Lower `BatchSize` (e.g. 8-16)
+
+This lets you validate data quality and output shape quickly before spending longer training time.
+
+## Structured MIDI generation from CLI
+
+After training, use `Scripts/generateMidi.wls` to generate a `.mid` with structure controls suitable for DAW editing.
+
+Example:
+
+```bash
+wolframscript -script Scripts/generateMidi.wls \
+  --predictor=Scripts/checkpoints_xxxx/predictor_yyyy.wlnet \
+  --out=generated_84bpm_44.mid \
+  --steps=500 \
+  --bpm=84 \
+  --timeSig=4/4 \
+  --bars=16 \
+  --quantizationDiv=4
+```
+
+Supported options:
+
+- `--predictor` path to predictor `.wlnet` (required)
+- `--out` output `.mid` path (default: `Scripts/generated.mid`)
+- `--steps` generation steps before structuring (default: `400`)
+- `--bpm` target tempo for beat grid snapping (default: `84`)
+- `--timeSig` target bar grouping (`N/D`, default: `4/4`)
+- `--bars` trim output to this many bars (default: `16`)
+- `--quantizationDiv` grid per beat (default: `4`, i.e. quarter-beat)
+- `--seedPitch`, `--seedDelay`, `--seedDuration`, `--seedVolume` for seed note controls
+
 Also, check out [this helpful guide][1] for information about modeling sequential data with neural nets - if you want to dive in deep and make your own generator.
 
 [1]: https://www.wolfram.com/language/12/neural-network-framework/train-a-net-to-model-english.html?product=mathematica
