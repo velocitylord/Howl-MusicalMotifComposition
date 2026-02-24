@@ -6,6 +6,7 @@
 (* THE UNLICENSE *)
 
 scriptPath = DirectoryName[ExpandFileName[First[$ScriptCommandLine]]];
+startDirectory = Directory[];
 SetDirectory[scriptPath];
 << "../Howl/HowlMidiTools.wl";
 
@@ -22,7 +23,6 @@ loadJsonConfig[path_] := Module[{cfg},
   If[AssociationQ[cfg], cfg, <||>]
 ];
 
-<<<<<<< HEAD
 rawNumber[val_] := Which[
   NumberQ[val], val,
   StringQ[val], Module[{stream, parsed},
@@ -44,10 +44,13 @@ toRealValue[val_, default_] := Module[{parsed = rawNumber[val]},
 
 toPositiveIntValue[val_, default_] := Max[1, Round@toIntValue[val, default]];
 
-=======
-toPositiveIntValue[val_, default_] := Max[1, Round@toIntValue[val, default]];
-
->>>>>>> improvements
+resolvePath[path_String] := Module[{normalized = StringReplace[path, "\\" -> "/"]},
+  If[
+    StringLength[normalized] == 0,
+    normalized,
+    If[AbsoluteFileNameQ[normalized], normalized, ExpandFileName[normalized, startDirectory]]
+  ]
+];
 toTimeSigValue[val_, default_] := Which[
   ListQ[val] && Length[val] == 2,
     {toPositiveIntValue[val[[1]], default[[1]]], toPositiveIntValue[val[[2]], default[[2]]]},
@@ -100,12 +103,14 @@ args = parseCliArgs[DeleteDuplicates[rawArgs]];
 
 predictorPath = argOrDefault[args, "predictor", ""];
 outPath = argOrDefault[args, "out", FileNameJoin[{scriptPath, "generated.mid"}]];
-<<<<<<< HEAD
 (* wolframscript reserves --config for its own settings; use --runConfig for this script. *)
-configPath = argOrDefault[args, "runConfig", argOrDefault[args, "config", ""]);
-=======
-configPath = argOrDefault[args, "config", ""];
->>>>>>> improvements
+configPath = argOrDefault[args, "runConfig", ""];
+If[StringLength[configPath] == 0,
+  configPath = argOrDefault[args, "config", ""]
+];
+predictorPath = resolvePath[predictorPath];
+outPath = resolvePath[outPath];
+configPath = resolvePath[configPath];
 config = loadJsonConfig[configPath];
 argOrCfg[key_, default_] := Lookup[config, key, argOrDefault[args, key, default]];
 
@@ -155,6 +160,7 @@ If[Length[structured] < 2,
 ];
 
 sound = Sound[HowlDecodeNotesV1[structured]];
+CreateDirectory[DirectoryName[outPath], CreateIntermediateDirectories -> True];
 Export[outPath, sound, "MIDI"];
 
 Print["Generated MIDI: ", outPath];
