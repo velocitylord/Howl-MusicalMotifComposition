@@ -9,9 +9,9 @@ scriptPath = DirectoryName[ExpandFileName[First[$ScriptCommandLine]]];
 SetDirectory[scriptPath];
 << "../Howl/HowlMidiTools.wl";
 
-parseCliArgs[args_List] := Association@Cases[args,
-  s_String /; StringStartsQ[s, "--"] && StringContainsQ[s, "="] :>
-    With[{kv = StringSplit[StringDrop[s, 2], "=", 2]}, kv[[1]] -> kv[[2]]]
+parseCliArgs[args_List] := Module[{pairs},
+  pairs = StringCases[args, "--" ~~ key : (WordCharacter..) ~~ "=" ~~ value__ :> (key -> value)];
+  Association[pairs]
 ];
 
 argOrDefault[assoc_, key_, default_] := Lookup[assoc, key, default];
@@ -61,11 +61,11 @@ sampleNext[predictor_, notes_, noteData_] := Module[{pred},
   }
 ];
 
-rawArgs = DeleteDuplicates@Join[
-  If[ListQ[$ScriptCommandLine], Select[$ScriptCommandLine, StringStartsQ[#, "--"] &], {}],
-  If[ListQ[$CommandLine], Select[$CommandLine, StringStartsQ[#, "--"] &], {}]
+rawArgs = Join[
+  If[ListQ[$ScriptCommandLine] && Length[$ScriptCommandLine] > 0, Rest[$ScriptCommandLine], {}],
+  If[ListQ[$CommandLine], Select[$CommandLine, StringStartsQ["--"]], {}]
 ];
-args = parseCliArgs[rawArgs];
+args = parseCliArgs[DeleteDuplicates[rawArgs]];
 
 predictorPath = argOrDefault[args, "predictor", ""];
 outPath = argOrDefault[args, "out", FileNameJoin[{scriptPath, "generated.mid"}]];
