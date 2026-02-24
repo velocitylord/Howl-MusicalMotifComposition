@@ -16,20 +16,13 @@ parseCliArgs[args_List] := Module[{pairs},
 
 argOrDefault[assoc_, key_, default_] := Lookup[assoc, key, default];
 
-parseNumber[str_] := Module[{stream, parsed},
-  stream = StringToStream[ToString[str]];
-  parsed = Quiet@Check[Read[stream, Number], $Failed];
-  Close[stream];
-  parsed
-];
-
 toInt[str_, default_] := Module[{parsed},
-  parsed = parseNumber[str];
+  parsed = Quiet@Check[ToExpression[str], $Failed];
   If[IntegerQ[parsed], parsed, default]
 ];
 
 toReal[str_, default_] := Module[{parsed},
-  parsed = parseNumber[str];
+  parsed = Quiet@Check[ToExpression[str], $Failed];
   If[NumericQ[parsed], parsed, default]
 ];
 
