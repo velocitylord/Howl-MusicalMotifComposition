@@ -16,30 +16,8 @@ parseCliArgs[args_List] := Module[{pairs},
 
 argOrDefault[assoc_, key_, default_] := Lookup[assoc, key, default];
 
-loadJsonConfig[path_] := Module[{cfg},
-  If[StringLength[path] == 0, Return[<||>]];
-  cfg = Quiet@Check[Import[path, "RawJSON"], $Failed];
-  If[AssociationQ[cfg], cfg, <||>]
-];
-
-rawNumber[val_] := Which[
-  NumberQ[val], val,
-  StringQ[val], Module[{stream, parsed},
-    stream = StringToStream[val];
-    parsed = Quiet@Check[Read[stream, Number], $Failed];
-    Close[stream];
-    parsed
-  ],
-  True, $Failed
-];
-
-toIntValue[val_, default_] := Module[{parsed = rawNumber[val]},
-  If[IntegerQ[parsed], parsed, default]
-];
-
-toRealValue[val_, default_] := Module[{parsed = rawNumber[val]},
-  If[NumericQ[parsed], parsed, default]
-];
+toInt[str_, default_] := Quiet@Check[ToExpression[str], default] /. _?(! IntegerQ[#] &) -> default;
+toReal[str_, default_] := Quiet@Check[ToExpression[str], default] /. _?(! NumericQ[#] &) -> default;
 
 toPositiveIntValue[val_, default_] := Max[1, Round@toIntValue[val, default]];
 
