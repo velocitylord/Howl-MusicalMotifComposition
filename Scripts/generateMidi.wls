@@ -10,9 +10,28 @@ startDirectory = Directory[];
 SetDirectory[scriptPath];
 << "../Howl/HowlMidiTools.wl";
 
-parseCliArgs[args_List] := Module[{pairs},
-  pairs = StringCases[args, "--" ~~ key : (WordCharacter..) ~~ "=" ~~ value__ :> (key -> value)];
-  Association[pairs]
+parseCliArgs[args_List] := Module[{assoc = <||>, key, value, i = 1, token, splitPos, split},
+  While[i <= Length[args],
+    token = args[[i]];
+    If[StringStartsQ[token, "--"],
+      splitPos = StringPosition[token, "="];
+      If[Length[splitPos] > 0,
+        split = StringSplit[StringDrop[token, 2], "=", 2];
+        If[Length[split] == 2,
+          assoc[split[[1]]] = split[[2]]
+        ],
+        key = StringDrop[token, 2];
+        value = "true";
+        If[i < Length[args] && !StringStartsQ[args[[i + 1]], "--"],
+          value = args[[i + 1]];
+          i++
+        ];
+        assoc[key] = value
+      ]
+    ];
+    i++
+  ];
+  assoc
 ];
 
 argOrDefault[assoc_, key_, default_] := Lookup[assoc, key, default];
@@ -44,36 +63,13 @@ toRealValue[val_, default_] := Module[{parsed = rawNumber[val]},
 
 toPositiveIntValue[val_, default_] := Max[1, Round@toIntValue[val, default]];
 
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> origin/improvements
->>>>>>> origin/improvements
 resolvePath[path_String] := Module[{normalized = StringReplace[path, "\\" -> "/"]},
   If[
     StringLength[normalized] == 0,
     normalized,
     If[AbsoluteFileNameQ[normalized], normalized, ExpandFileName[normalized, startDirectory]]
   ]
-<<<<<<< HEAD
 ];
-
-=======
-<<<<<<< HEAD
-];
-
-=======
-=======
-resolvePath[path_String] := If[
-  StringLength[path] == 0,
-  path,
-  If[AbsoluteFileNameQ[path], path, ExpandFileName[path, startDirectory]]
->>>>>>> origin/improvements
-];
->>>>>>> origin/improvements
->>>>>>> origin/improvements
 toTimeSigValue[val_, default_] := Which[
   ListQ[val] && Length[val] == 2,
     {toPositiveIntValue[val[[1]], default[[1]]], toPositiveIntValue[val[[2]], default[[2]]]},
@@ -128,35 +124,19 @@ sampleNext[predictor_, notes_, noteData_] := Module[{pred},
   }
 ];
 
-rawArgs = Join[
-  If[ListQ[$ScriptCommandLine] && Length[$ScriptCommandLine] > 0, Rest[$ScriptCommandLine], {}],
-  If[ListQ[$CommandLine], Select[$CommandLine, StringStartsQ["--"]], {}]
+rawArgs = If[ListQ[$ScriptCommandLine] && Length[$ScriptCommandLine] > 0,
+  Rest[$ScriptCommandLine],
+  {}
 ];
-args = parseCliArgs[DeleteDuplicates[rawArgs]];
+args = parseCliArgs[rawArgs];
 
 predictorPath = argOrDefault[args, "predictor", ""];
 outPath = argOrDefault[args, "out", FileNameJoin[{scriptPath, "generated.mid"}]];
 (* wolframscript reserves --config for its own settings; use --runConfig for this script. *)
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> origin/improvements
->>>>>>> origin/improvements
 configPath = argOrDefault[args, "runConfig", ""];
 If[StringLength[configPath] == 0,
   configPath = argOrDefault[args, "config", ""]
 ];
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
-=======
-configPath = argOrDefault[args, "runConfig", argOrDefault[args, "config", ""]);
->>>>>>> origin/improvements
->>>>>>> origin/improvements
->>>>>>> origin/improvements
 predictorPath = resolvePath[predictorPath];
 outPath = resolvePath[outPath];
 configPath = resolvePath[configPath];
