@@ -29,10 +29,10 @@ SetDirectory["Howl"]; (* Wherever the git repo is *)
 << "Howl/HowlMidiTools.wl"
 ```
 
-To generate a dataset for training from a folder containing .mid ("MIDI") files, you can simply run:
+To generate a dataset for training from a folder containing .mid or .midi ("MIDI") files, you can simply run:
 
 ```mathematica
-datasetPath = "/path/to/my/.mid/files";
+datasetPath = "/path/to/my/midi/files";
 dataset = Map[HowlMidiImport, HowlFindMidis[datasetPath]];
 Length[dataset]
 ```
