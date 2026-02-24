@@ -16,8 +16,22 @@ parseCliArgs[args_List] := Module[{pairs},
 
 argOrDefault[assoc_, key_, default_] := Lookup[assoc, key, default];
 
-toInt[str_, default_] := Quiet@Check[ToExpression[str], default] /. _?(! IntegerQ[#] &) -> default;
-toReal[str_, default_] := Quiet@Check[ToExpression[str], default] /. _?(! NumericQ[#] &) -> default;
+parseNumber[str_] := Module[{stream, parsed},
+  stream = StringToStream[ToString[str]];
+  parsed = Quiet@Check[Read[stream, Number], $Failed];
+  Close[stream];
+  parsed
+];
+
+toInt[str_, default_] := Module[{parsed},
+  parsed = parseNumber[str];
+  If[IntegerQ[parsed], parsed, default]
+];
+
+toReal[str_, default_] := Module[{parsed},
+  parsed = parseNumber[str];
+  If[NumericQ[parsed], parsed, default]
+];
 
 toPositiveInt[str_, default_] := Max[1, Round@toInt[str, default]];
 
