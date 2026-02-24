@@ -61,7 +61,7 @@ You can use the Scripts/trainRnn.wls script to train your own simple 1-layer LST
 If you are training on a smaller custom dataset (e.g. ~150 MIDI files) and do not have a GPU, start with shorter CPU runs and iterate quickly:
 
 - In `Scripts/trainRnn.wls`, set `TargetDevice -> "CPU"`
-- Reduce `TimeGoal` from 12 hours to a small first pass (30-90 minutes)
+- Keep `TimeGoal` at 1 hour for first-pass CPU runs, then increase it for longer training once outputs look good
 - Lower `BatchSize` (e.g. 8-16)
 
 This lets you validate data quality and output shape quickly before spending longer training time.
