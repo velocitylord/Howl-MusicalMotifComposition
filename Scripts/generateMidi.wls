@@ -47,6 +47,9 @@ toPositiveIntValue[val_, default_] := Max[1, Round@toIntValue[val, default]];
 <<<<<<< HEAD
 =======
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> origin/improvements
 >>>>>>> origin/improvements
 resolvePath[path_String] := Module[{normalized = StringReplace[path, "\\" -> "/"]},
   If[
@@ -58,6 +61,10 @@ resolvePath[path_String] := Module[{normalized = StringReplace[path, "\\" -> "/"
 ];
 
 =======
+<<<<<<< HEAD
+];
+
+=======
 =======
 resolvePath[path_String] := If[
   StringLength[path] == 0,
@@ -65,6 +72,7 @@ resolvePath[path_String] := If[
   If[AbsoluteFileNameQ[path], path, ExpandFileName[path, startDirectory]]
 >>>>>>> origin/improvements
 ];
+>>>>>>> origin/improvements
 >>>>>>> origin/improvements
 toTimeSigValue[val_, default_] := Which[
   ListQ[val] && Length[val] == 2,
@@ -132,6 +140,9 @@ outPath = argOrDefault[args, "out", FileNameJoin[{scriptPath, "generated.mid"}]]
 <<<<<<< HEAD
 =======
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> origin/improvements
 >>>>>>> origin/improvements
 configPath = argOrDefault[args, "runConfig", ""];
 If[StringLength[configPath] == 0,
@@ -139,8 +150,11 @@ If[StringLength[configPath] == 0,
 ];
 <<<<<<< HEAD
 =======
+<<<<<<< HEAD
+=======
 =======
 configPath = argOrDefault[args, "runConfig", argOrDefault[args, "config", ""]);
+>>>>>>> origin/improvements
 >>>>>>> origin/improvements
 >>>>>>> origin/improvements
 predictorPath = resolvePath[predictorPath];
