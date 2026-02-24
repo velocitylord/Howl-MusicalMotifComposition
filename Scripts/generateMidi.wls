@@ -44,14 +44,28 @@ toRealValue[val_, default_] := Module[{parsed = rawNumber[val]},
 
 toPositiveIntValue[val_, default_] := Max[1, Round@toIntValue[val, default]];
 
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> origin/improvements
 resolvePath[path_String] := Module[{normalized = StringReplace[path, "\\" -> "/"]},
   If[
     StringLength[normalized] == 0,
     normalized,
     If[AbsoluteFileNameQ[normalized], normalized, ExpandFileName[normalized, startDirectory]]
   ]
+<<<<<<< HEAD
 ];
 
+=======
+=======
+resolvePath[path_String] := If[
+  StringLength[path] == 0,
+  path,
+  If[AbsoluteFileNameQ[path], path, ExpandFileName[path, startDirectory]]
+>>>>>>> origin/improvements
+];
+>>>>>>> origin/improvements
 toTimeSigValue[val_, default_] := Which[
   ListQ[val] && Length[val] == 2,
     {toPositiveIntValue[val[[1]], default[[1]]], toPositiveIntValue[val[[2]], default[[2]]]},
@@ -115,10 +129,20 @@ args = parseCliArgs[DeleteDuplicates[rawArgs]];
 predictorPath = argOrDefault[args, "predictor", ""];
 outPath = argOrDefault[args, "out", FileNameJoin[{scriptPath, "generated.mid"}]];
 (* wolframscript reserves --config for its own settings; use --runConfig for this script. *)
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> origin/improvements
 configPath = argOrDefault[args, "runConfig", ""];
 If[StringLength[configPath] == 0,
   configPath = argOrDefault[args, "config", ""]
 ];
+<<<<<<< HEAD
+=======
+=======
+configPath = argOrDefault[args, "runConfig", argOrDefault[args, "config", ""]);
+>>>>>>> origin/improvements
+>>>>>>> origin/improvements
 predictorPath = resolvePath[predictorPath];
 outPath = resolvePath[outPath];
 configPath = resolvePath[configPath];
