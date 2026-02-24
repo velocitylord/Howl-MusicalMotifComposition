@@ -224,9 +224,9 @@ trainingResults = NetTrain[
   TrainingProgressCheckpointing-> {
     "Directory", checkpointDir, "Interval"->Quantity[2,"Hours"]
   },
-  TargetDevice -> {"CPU", 1},
+  TargetDevice -> "CPU",
   BatchSize -> 8,
-  WorkingPrecision -> "Mixed",
+  WorkingPrecision -> "Real32",
   TimeGoal -> Quantity[1, "Hours"]
 ];
 
