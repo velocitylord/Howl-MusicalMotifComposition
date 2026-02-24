@@ -66,39 +66,36 @@ If you are training on a smaller custom dataset (e.g. ~150 MIDI files) and do no
 
 This lets you validate data quality and output shape quickly before spending longer training time.
 
-## Predictor MIDI generation from CLI
+## MIDI generation (Alec's original workflow)
 
-After training, use `Scripts/generateMidi.wls` to generate a `.mid` from your trained predictor (`.wlnet`).
+Alec's core workflow in this repo is:
 
-Windows example (from repo root):
+1. Build a dataset with `Scripts/makeDataset.wls`
+2. Train with `Scripts/trainRnn.wls`
+3. Export the trained `predictor_*.wlnet`
+4. Generate note sequences from that predictor in a Wolfram notebook/script and convert to MIDI with `HowlDecodeNotesV1`
 
-```bat
-wolframscript -file Scripts/generateMidi.wls --predictor="Scripts\checkpoints_xxxx\predictor_yyyy.wlnet" --runConfig="Scripts/runConfig.example.json" --out="Scripts/generated1.mid"
+Minimal Wolfram sketch (from repo root):
+
+```mathematica
+SetDirectory[NotebookDirectory[]];
+<< "Howl/HowlMidiTools.wl";
+predictor = Import["Scripts/checkpoints_xxxx/predictor_yyyy.wlnet"];
+
+notes = {60};
+noteData = {{0.25, 0.30, 0.8}}; (* delay, duration, volume *)
+
+Do[
+  pred = predictor[<|"Notes" -> notes, "NoteData" -> NumericArray[noteData, "Real32"]|>];
+  AppendTo[notes, pred["NotesPred"]];
+  AppendTo[noteData, pred["NoteDataPred"]];
+, {400}];
+
+encoded = Transpose@{noteData[[All,1]], noteData[[All,2]], noteData[[All,3]], notes};
+Export["Scripts/generated.mid", Sound[HowlDecodeNotesV1[encoded]], "MIDI"];
 ```
 
-macOS/Linux example (from repo root):
-
-```bash
-wolframscript -file Scripts/generateMidi.wls --predictor="Scripts/checkpoints_xxxx/predictor_yyyy.wlnet" --runConfig="Scripts/runConfig.example.json" --out="Scripts/generated1.mid"
-```
-
-Optional overrides (CLI values override config values):
-
-```bash
-wolframscript -file Scripts/generateMidi.wls --predictor="Scripts/checkpoints_xxxx/predictor_yyyy.wlnet" --runConfig="Scripts/runConfig.example.json" --out="Scripts/generated1.mid" --steps=500 --bpm=84 --timeSig=4/4 --bars=16 --quantizationDiv=4
-```
-
-Supported options:
-
-- `--predictor` path to predictor `.wlnet` (required)
-- `--runConfig` path to JSON config for generation settings (recommended)
-- `--out` output `.mid` path (default: `Scripts/generated.mid`)
-- `--steps` generation steps before structuring (default: `400`)
-- `--bpm` target tempo for beat grid snapping (default: `84`)
-- `--timeSig` target bar grouping (`N/D`, default: `4/4`)
-- `--bars` trim output to this many bars (default: `16`)
-- `--quantizationDiv` grid per beat (default: `4`, i.e. quarter-beat)
-- `--seedPitch`, `--seedDelay`, `--seedDuration`, `--seedVolume` for seed note controls
+This keeps generation close to the original training/predictor pipeline and is usually easiest to debug before adding CLI wrappers.
 
 Also, check out [this helpful guide][1] for information about modeling sequential data with neural nets - if you want to dive in deep and make your own generator.
 
