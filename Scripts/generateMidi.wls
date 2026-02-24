@@ -10,7 +10,7 @@ SetDirectory[scriptPath];
 << "../Howl/HowlMidiTools.wl";
 
 parseCliArgs[args_List] := Module[{pairs},
-  pairs = StringCases[args, "--" ~~ key : (WordCharacter ..) ~~ "=" ~~ value__ :> (key -> value)];
+  pairs = StringCases[args, "--" ~~ key : (WordCharacter..) ~~ "=" ~~ value__ :> (key -> value)];
   Association[pairs]
 ];
 
