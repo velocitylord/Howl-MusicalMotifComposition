@@ -66,26 +66,32 @@ If you are training on a smaller custom dataset (e.g. ~150 MIDI files) and do no
 
 This lets you validate data quality and output shape quickly before spending longer training time.
 
-## Structured MIDI generation from CLI
+## Predictor MIDI generation from CLI
 
-After training, use `Scripts/generateMidi.wls` to generate a `.mid` with structure controls suitable for DAW editing.
+After training, use `Scripts/generateMidi.wls` to generate a `.mid` from your trained predictor (`.wlnet`).
 
-Example:
+Windows example (from repo root):
+
+```bat
+wolframscript -file Scripts/generateMidi.wls --predictor="Scripts\checkpoints_xxxx\predictor_yyyy.wlnet" --runConfig="Scripts/runConfig.example.json" --out="Scripts/generated1.mid"
+```
+
+macOS/Linux example (from repo root):
 
 ```bash
-wolframscript -script Scripts/generateMidi.wls \
-  --predictor=Scripts/checkpoints_xxxx/predictor_yyyy.wlnet \
-  --out=generated_84bpm_44.mid \
-  --steps=500 \
-  --bpm=84 \
-  --timeSig=4/4 \
-  --bars=16 \
-  --quantizationDiv=4
+wolframscript -file Scripts/generateMidi.wls --predictor="Scripts/checkpoints_xxxx/predictor_yyyy.wlnet" --runConfig="Scripts/runConfig.example.json" --out="Scripts/generated1.mid"
+```
+
+Optional overrides (CLI values override config values):
+
+```bash
+wolframscript -file Scripts/generateMidi.wls --predictor="Scripts/checkpoints_xxxx/predictor_yyyy.wlnet" --runConfig="Scripts/runConfig.example.json" --out="Scripts/generated1.mid" --steps=500 --bpm=84 --timeSig=4/4 --bars=16 --quantizationDiv=4
 ```
 
 Supported options:
 
 - `--predictor` path to predictor `.wlnet` (required)
+- `--runConfig` path to JSON config for generation settings (recommended)
 - `--out` output `.mid` path (default: `Scripts/generated.mid`)
 - `--steps` generation steps before structuring (default: `400`)
 - `--bpm` target tempo for beat grid snapping (default: `84`)
