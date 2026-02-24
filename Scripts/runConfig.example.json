@@ -1,0 +1,11 @@
+{
+  "steps": 500,
+  "seedPitch": 0,
+  "seedDelay": 0.25,
+  "seedDuration": 0.3,
+  "seedVolume": 0.8,
+  "bpm": 80,
+  "timeSig": [4, 4],
+  "quantizationDiv": 4,
+  "bars": 16
+}
