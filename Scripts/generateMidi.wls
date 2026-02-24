@@ -45,12 +45,19 @@ toRealValue[val_, default_] := Module[{parsed = rawNumber[val]},
 toPositiveIntValue[val_, default_] := Max[1, Round@toIntValue[val, default]];
 
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> origin/improvements
 resolvePath[path_String] := Module[{normalized = StringReplace[path, "\\" -> "/"]},
   If[
     StringLength[normalized] == 0,
     normalized,
     If[AbsoluteFileNameQ[normalized], normalized, ExpandFileName[normalized, startDirectory]]
   ]
+<<<<<<< HEAD
+];
+
+=======
 =======
 resolvePath[path_String] := If[
   StringLength[path] == 0,
@@ -58,6 +65,7 @@ resolvePath[path_String] := If[
   If[AbsoluteFileNameQ[path], path, ExpandFileName[path, startDirectory]]
 >>>>>>> origin/improvements
 ];
+>>>>>>> origin/improvements
 toTimeSigValue[val_, default_] := Which[
   ListQ[val] && Length[val] == 2,
     {toPositiveIntValue[val[[1]], default[[1]]], toPositiveIntValue[val[[2]], default[[2]]]},
@@ -70,7 +78,6 @@ toTimeSigValue[val_, default_] := Which[
   True, default
 ];
 
-(* Snap note start/end to beat grid and keep durations > 0 *)
 quantizeEncoded[encoded_, beatSeconds_, quantizationDiv_] := Module[
   {grid = beatSeconds/quantizationDiv, starts, ends, qStarts, qEnds},
   starts = Accumulate[encoded[[All, 1]]];
@@ -94,6 +101,17 @@ trimToBars[encoded_, beatSeconds_, timeSig_, bars_] := Module[
   Pick[encoded, mask]
 ];
 
+applySimpleStructure[encoded_, structure_] := Module[
+  {transpose, pitchMin, pitchMax, adjusted},
+  If[!AssociationQ[structure], Return[encoded]];
+  transpose = toIntValue[Lookup[structure, "transpose", 0], 0);
+  pitchMin = Clip[toIntValue[Lookup[structure, "pitchMin", 0], 0], {0, 127}];
+  pitchMax = Clip[toIntValue[Lookup[structure, "pitchMax", 127], 127], {pitchMin, 127}];
+  adjusted = encoded;
+  adjusted[[All, 4]] = Clip[adjusted[[All, 4]] + transpose, {pitchMin, pitchMax}];
+  adjusted
+];
+
 sampleNext[predictor_, notes_, noteData_] := Module[{pred},
   pred = predictor[<|"Notes" -> notes, "NoteData" -> NumericArray[noteData, "Real32"]|>];
   {
@@ -112,12 +130,18 @@ predictorPath = argOrDefault[args, "predictor", ""];
 outPath = argOrDefault[args, "out", FileNameJoin[{scriptPath, "generated.mid"}]];
 (* wolframscript reserves --config for its own settings; use --runConfig for this script. *)
 <<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> origin/improvements
 configPath = argOrDefault[args, "runConfig", ""];
 If[StringLength[configPath] == 0,
   configPath = argOrDefault[args, "config", ""]
 ];
+<<<<<<< HEAD
+=======
 =======
 configPath = argOrDefault[args, "runConfig", argOrDefault[args, "config", ""]);
+>>>>>>> origin/improvements
 >>>>>>> origin/improvements
 predictorPath = resolvePath[predictorPath];
 outPath = resolvePath[outPath];
@@ -126,14 +150,18 @@ config = loadJsonConfig[configPath];
 argOrCfg[key_, default_] := Lookup[config, key, argOrDefault[args, key, default]];
 
 steps = toPositiveIntValue[argOrCfg["steps", 400], 400];
-seedPitch = toIntValue[argOrCfg["seedPitch", 0], 0);
-seedDelay = Max[0.0, toRealValue[argOrCfg["seedDelay", 0.25], 0.25)];
-seedDuration = Max[0.02, toRealValue[argOrCfg["seedDuration", 0.3], 0.3)];
+seedPitch = toIntValue[argOrCfg["seedPitch", 60], 60);
+seedDelay = Max[0.0, toRealValue[argOrCfg["seedDelay", 0.25], 0.25]];
+seedDuration = Max[0.02, toRealValue[argOrCfg["seedDuration", 0.3], 0.3]];
 seedVolume = Clip[toRealValue[argOrCfg["seedVolume", 0.8], 0.8), {0.1, 1.0}];
-bpm = Max[30.0, toRealValue[argOrCfg["bpm", 84.0], 84.0)];
+bpm = Max[30.0, toRealValue[argOrCfg["bpm", 84.0], 84.0]];
 timeSignature = toTimeSigValue[argOrCfg["timeSig", {4, 4}], {4, 4}];
-quantizationDiv = Max[1, toPositiveIntValue[argOrCfg["quantizationDiv", 4], 4)];
-bars = Max[1, toPositiveIntValue[argOrCfg["bars", 16], 16)];
+quantizationDiv = Max[1, toPositiveIntValue[argOrCfg["quantizationDiv", 4], 4]];
+bars = Max[1, toPositiveIntValue[argOrCfg["bars", 16], 16]];
+structure = Lookup[config, "structure", <||>];
+If[AssociationQ[structure] && KeyExistsQ[structure, "bars"],
+  bars = Max[1, toPositiveIntValue[structure["bars"], bars]]
+];
 
 If[StringLength[predictorPath] == 0,
   Print["Missing --predictor=/path/to/predictor.wlnet"]; Exit[1]
@@ -150,8 +178,12 @@ noteData = {{seedDelay, seedDuration, seedVolume}};
 Do[
   Module[{nextPitch, nextData},
     {nextPitch, nextData} = sampleNext[predictor, notes, noteData];
-    AppendTo[notes, nextPitch];
-    AppendTo[noteData, nextData];
+    AppendTo[notes, Clip[toIntValue[nextPitch, seedPitch], {0, 127}]];
+    AppendTo[noteData, {
+      Max[0.0, toRealValue[nextData[[1]], seedDelay]],
+      Max[0.02, toRealValue[nextData[[2]], seedDuration]],
+      Clip[toRealValue[nextData[[3]], seedVolume], {0.1, 1.0}]
+    }];
   ],
   {steps}
 ];
@@ -163,6 +195,7 @@ encoded = Transpose@{
   notes
 };
 
+encoded = applySimpleStructure[encoded, structure];
 beatSeconds = 60.0 / bpm;
 structured = encoded // quantizeEncoded[#, beatSeconds, quantizationDiv] & // trimToBars[#, beatSeconds, timeSignature, bars] &;
 

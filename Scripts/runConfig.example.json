@@ -1,11 +1,17 @@
 {
   "steps": 500,
-  "seedPitch": 0,
+  "seedPitch": 60,
   "seedDelay": 0.25,
   "seedDuration": 0.3,
   "seedVolume": 0.8,
-  "bpm": 80,
+  "bpm": 84,
   "timeSig": [4, 4],
   "quantizationDiv": 4,
-  "bars": 16
+  "bars": 16,
+  "structure": {
+    "bars": 16,
+    "transpose": 0,
+    "pitchMin": 36,
+    "pitchMax": 96
+  }
 }
