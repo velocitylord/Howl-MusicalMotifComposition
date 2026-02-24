@@ -16,11 +16,38 @@ parseCliArgs[args_List] := Module[{pairs},
 
 argOrDefault[assoc_, key_, default_] := Lookup[assoc, key, default];
 
-toInt[str_, default_] := Quiet@Check[ToExpression[str], default] /. _?(! IntegerQ[#] &) -> default;
-toReal[str_, default_] := Quiet@Check[ToExpression[str], default] /. _?(! NumericQ[#] &) -> default;
+loadJsonConfig[path_] := Module[{cfg},
+  If[StringLength[path] == 0, Return[<||>]];
+  cfg = Quiet@Check[Import[path, "RawJSON"], $Failed];
+  If[AssociationQ[cfg], cfg, <||>]
+];
+
+<<<<<<< HEAD
+rawNumber[val_] := Which[
+  NumberQ[val], val,
+  StringQ[val], Module[{stream, parsed},
+    stream = StringToStream[val];
+    parsed = Quiet@Check[Read[stream, Number], $Failed];
+    Close[stream];
+    parsed
+  ],
+  True, $Failed
+];
+
+toIntValue[val_, default_] := Module[{parsed = rawNumber[val]},
+  If[IntegerQ[parsed], parsed, default]
+];
+
+toRealValue[val_, default_] := Module[{parsed = rawNumber[val]},
+  If[NumericQ[parsed], parsed, default]
+];
 
 toPositiveIntValue[val_, default_] := Max[1, Round@toIntValue[val, default]];
 
+=======
+toPositiveIntValue[val_, default_] := Max[1, Round@toIntValue[val, default]];
+
+>>>>>>> improvements
 toTimeSigValue[val_, default_] := Which[
   ListQ[val] && Length[val] == 2,
     {toPositiveIntValue[val[[1]], default[[1]]], toPositiveIntValue[val[[2]], default[[2]]]},
@@ -73,7 +100,12 @@ args = parseCliArgs[DeleteDuplicates[rawArgs]];
 
 predictorPath = argOrDefault[args, "predictor", ""];
 outPath = argOrDefault[args, "out", FileNameJoin[{scriptPath, "generated.mid"}]];
+<<<<<<< HEAD
+(* wolframscript reserves --config for its own settings; use --runConfig for this script. *)
+configPath = argOrDefault[args, "runConfig", argOrDefault[args, "config", ""]);
+=======
 configPath = argOrDefault[args, "config", ""];
+>>>>>>> improvements
 config = loadJsonConfig[configPath];
 argOrCfg[key_, default_] := Lookup[config, key, argOrDefault[args, key, default]];
 
