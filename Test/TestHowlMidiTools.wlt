@@ -92,17 +92,6 @@ VerificationTest[(* 11 *)
   4
 ];
 
-VerificationTest[(* 12 *)
-  Module[{testdir = CreateDirectory[], exts},
-    Export[FileNameJoin[{testdir, "a.mid"}], Sound@{SoundNote["C4", {0, 1}]}];
-    Export[FileNameJoin[{testdir, "b.midi"}], Sound@{SoundNote["D4", {0, 1}]}];
-    exts = Sort[FileExtension /@ HowlFindMidis[testdir]];
-    DeleteDirectory[testdir, DeleteContents -> True];
-    exts
-  ]
-  ,
-  {"mid", "midi"}
-];
 
 EndTestSection[]
 

@@ -196,10 +196,7 @@ HowlAugmentV1[encodedV1_] := encodedV1 // Composition[
 
 (* Note, this takes 2 minutes with a directory containing 200,000 files. *)
 Clear[HowlFindMidis];
-HowlFindMidis[directory_String] := DeleteDuplicates@Join[
-  FileNames["*.mid", directory, Infinity, IgnoreCase -> True],
-  FileNames["*.midi", directory, Infinity, IgnoreCase -> True]
-];
+HowlFindMidis[directory_String] := FileNames["*.mid", directory, Infinity, IgnoreCase -> True];
 
 
 Clear[HowlMidiImport];

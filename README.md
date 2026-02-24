@@ -39,10 +39,17 @@ Length[dataset]
 
 This can take some time (around 3 seconds per .mid file), so be patient!
 
+
+On Windows Command Prompt, you can also run the helper script directly:
+
+```bat
+wolframscript -file Scripts\makeDataset.wls "C:\Users\jasolomon\Downloads\seminar-dataset-150" "Scripts\dataset.wxf"
+```
+
 Then, you can save your dataset to a file so you do not have to re-generate it in the future:
 
 ```mathematica
-Export["datset.wxf", dataset]
+Export["dataset.wxf", dataset]
 ```
 
 Now, you can use this note data to train your neural network to generate music.
