@@ -97,6 +97,46 @@ Export["Scripts/generated.mid", Sound[HowlDecodeNotesV1[encoded]], "MIDI"];
 
 This keeps generation close to the original training/predictor pipeline and is usually easiest to debug before adding CLI wrappers.
 
+## Piece + timestamp improvisation workflow (new)
+
+If your goal is to improvise from a specific region of a known piece, use the new script:
+
+```bash
+wolframscript -file Scripts/improviseFromPiece.wls \
+  Scripts/checkpoints_xxxx/predictor_yyyy.wlnet \
+  Scripts/dataset.wxf \
+  "moonlight" \
+  4 25 \
+  harmony \
+  256 \
+  Scripts/moonlight_improv.mid \
+  "auto"
+```
+
+Arguments:
+
+1. `predictorFile`: exported `predictor_*.wlnet` from training
+2. `datasetFile`: your dataset `.wxf` produced by `Scripts/makeDataset.wls`
+3. `pieceQuery`: case-insensitive substring match against file names in the dataset
+4. `startSec endSec`: timestamp window inside the selected piece (for seed extraction)
+5. `mode` (optional): `melody` (default) or `harmony`
+6. `numGenerated` (optional): number of new notes to generate (default `256`)
+7. `outputMidi` (optional): output MIDI path
+8. `harmonyKey` (optional, harmony mode): `auto` (default) or explicit key like `"C major"`, `"A minor"`
+
+Why this approach instead of a notebook-first workflow:
+
+- The script is reproducible and easy to automate from terminal/CI.
+- It still works great with notebooks: call it via `RunProcess` or copy the same logic into a notebook cell once you like the results.
+- You can iterate quickly by changing just the piece query + timestamp range.
+
+`melody` mode biases generated notes upward relative to the seed median pitch.
+
+`harmony` mode now uses **key-aware diatonic chord tones** instead of fixed random intervals:
+- by default (`harmonyKey = "auto"`), the script estimates key from the seed window
+- you can override with explicit key input (e.g. `"D minor"`)
+- harmony notes are chosen from the nearest diatonic triad below the melody note for more musically grounded voicing.
+
 Also, check out [this helpful guide][1] for information about modeling sequential data with neural nets - if you want to dive in deep and make your own generator.
 
 [1]: https://www.wolfram.com/language/12/neural-network-framework/train-a-net-to-model-english.html?product=mathematica
