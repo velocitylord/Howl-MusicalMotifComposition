@@ -97,20 +97,28 @@ Export["Scripts/generated.mid", Sound[HowlDecodeNotesV1[encoded]], "MIDI"];
 
 This keeps generation close to the original training/predictor pipeline and is usually easiest to debug before adding CLI wrappers.
 
-## Piece + timestamp improvisation workflow (new)
+## Piece + timestamp constrained rework workflow (new)
 
-If your goal is to improvise from a specific region of a known piece, use the new script:
+`Scripts/improviseFromPiece.wls` now performs a **constrained rework** (not melody/harmony continuation):
+
+- selects a piece from `dataset.wxf` by filename substring,
+- extracts your target timestamp window,
+- rewrites that window event-by-event using predictor suggestions,
+- applies deviation caps to preserve structure/feel,
+- projects pitches onto detected bar-level chord context,
+- exports both MIDI and a per-bar key/chord analysis JSON.
 
 ```bash
 wolframscript -file Scripts/improviseFromPiece.wls \
   Scripts/checkpoints_xxxx/predictor_yyyy.wlnet \
   Scripts/dataset.wxf \
-  "moonlight" \
+  "Ashitaka" \
   4 25 \
-  harmony \
-  256 \
-  Scripts/moonlight_improv.mid \
-  "auto"
+  Scripts/ashitaka_rework.mid \
+  2 \
+  0.12 \
+  0.35 \
+  Scripts/ashitaka_rework_analysis.json
 ```
 
 Arguments:
@@ -118,24 +126,33 @@ Arguments:
 1. `predictorFile`: exported `predictor_*.wlnet` from training
 2. `datasetFile`: your dataset `.wxf` produced by `Scripts/makeDataset.wls`
 3. `pieceQuery`: case-insensitive substring match against file names in the dataset
-4. `startSec endSec`: timestamp window inside the selected piece (for seed extraction)
-5. `mode` (optional): `melody` (default) or `harmony`
-6. `numGenerated` (optional): number of new notes to generate (default `256`)
-7. `outputMidi` (optional): output MIDI path
-8. `harmonyKey` (optional, harmony mode): `auto` (default) or explicit key like `"C major"`, `"A minor"`
+4. `startSec endSec`: timestamp window to rework
+5. `outputMidi` (optional): output MIDI path (default `Scripts/rework.mid`)
+6. `maxPitchDelta` (optional): max semitone shift from each original pitch (default `2`)
+7. `maxTimingFrac` (optional): max timing/duration relative deviation cap (default `0.12`)
+8. `keepOriginalProb` (optional): probability each note stays exactly original (default `0.35`)
+9. `analysisJson` (optional): per-bar analysis output JSON path
 
-Why this approach instead of a notebook-first workflow:
+### Chord-template library (root-relative pitch-class sets)
 
-- The script is reproducible and easy to automate from terminal/CI.
-- It still works great with notebooks: call it via `RunProcess` or copy the same logic into a notebook cell once you like the results.
-- You can iterate quickly by changing just the piece query + timestamp range.
+The script includes categorized chord templates for harmonic projection:
 
-`melody` mode biases generated notes upward relative to the seed median pitch.
+- **Triads:** major, minor, diminished, augmented, sus2, sus4
+- **Sixths:** 6, m6, 6/9, m6/9
+- **Sevenths:** dominant 7, major 7, minor 7, minor-major 7, half-diminished 7, diminished 7, 7sus4, augmented 7, augmented-major 7
+- **Ninths:** add9, minor add9, dominant 9, major 9, minor 9, 9sus4
 
-`harmony` mode now uses **key-aware diatonic chord tones** instead of fixed random intervals:
-- by default (`harmonyKey = "auto"`), the script estimates key from the seed window
-- you can override with explicit key input (e.g. `"D minor"`)
-- harmony notes are chosen from the nearest diatonic triad below the melody note for more musically grounded voicing.
+These templates are expanded over all 12 roots and used to pick the best chord per bar.
+
+### Bar-level key/chord timeline
+
+The script estimates bar windows and emits chord/key per bar in `analysisJson`:
+
+- It estimates beat length from note onsets in the selected window.
+- It tries to read MIDI time signature metadata and uses the numerator when available.
+- If metadata is unavailable, it falls back to **4/4-like** behavior.
+
+This gives practical bar-by-bar harmonic context for constrained pitch projection.
 
 Also, check out [this helpful guide][1] for information about modeling sequential data with neural nets - if you want to dive in deep and make your own generator.
 
