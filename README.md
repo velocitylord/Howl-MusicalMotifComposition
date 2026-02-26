@@ -161,6 +161,13 @@ This gives practical bar-by-bar harmonic context for constrained pitch projectio
   - Recent fixes normalize predictor outputs (`NotesPred` / `NoteDataPred`) before blending and sanitize non-scalar imported note rows so rework data stays valid numeric lists.
 - If you see `Multiple matches found. Using first: ...`, your `pieceQuery` matched more than one file. Use a more specific query string.
 - If you see `ToExpression::sntx` near helper initialization, update to the latest script version; helper list assignments were rewritten in a parser-safer form for Wolfram CLI compatibility.
+- If you see `ToExpression::sntx`, make sure your local branch is fully up to date and retry with a clean copy of `Scripts/improviseFromPiece.wls`.
+- If you see `ToExpression::sntx` near the chord helper initialization, make sure your branch has the latest script update (the helper symbol reset was rewritten to avoid parser-fragile long `ClearAll[...]` lists).
+- If you see errors mentioning `NumericArray::lend`, `Part::partw`, `Export::jsonstrictencoding`, or `NetGraph::incseqlen`, pull the latest branch version of `Scripts/improviseFromPiece.wls`.
+  - Recent fixes normalize predictor outputs (`NotesPred` / `NoteDataPred`) before blending and sanitize non-scalar imported note rows so rework data stays valid numeric lists.
+- If you see errors mentioning `NumericArray::lend`, `Part::partw`, or `NetGraph::incseqlen`, pull the latest branch version of `Scripts/improviseFromPiece.wls`.
+  - Recent fixes normalize predictor outputs (`NotesPred` / `NoteDataPred`) before blending so rework data stays valid numeric lists.
+- If you see `Multiple matches found. Using first: ...`, your `pieceQuery` matched more than one file. Use a more specific query string.
 - If the output MIDI is unexpectedly short, inspect the generated `analysisJson` and confirm the selected timestamp window includes enough notes and that predictor loading succeeded.
 
 Also, check out [this helpful guide][1] for information about modeling sequential data with neural nets - if you want to dive in deep and make your own generator.

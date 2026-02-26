@@ -100,6 +100,24 @@ noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 ->
 noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
 majorScaleSteps = List[0, 2, 4, 5, 7, 9, 11];
 minorScaleSteps = List[0, 2, 3, 5, 7, 8, 10];
+chordHelperSymbols = {
+  noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
+ClearAll[noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
+  scoreKeyFit, detectKeyFromPcs, chordTemplateCategories, flattenChordTemplates,
+  chordNameFor, buildRootedCandidates, overlapWeight, barWindows, estimateBeatsPerBar,
+  estimateBeatSeconds, scoreChordCandidate, bestChordForWindow, chordTimelineForWindow,
+  chooseStableChordForWindow, buildStableChordTimeline, preferredChordCategories,
+  categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch,
+  keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch
+};
+Scan[ClearAll, chordHelperSymbols];
+  categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
+  categoryBias, globalKeyProfileFromWindow, nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
+
+noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 -> "F#", 7 -> "G", 8 -> "Ab", 9 -> "A", 10 -> "Bb", 11 -> "B"|>;
+noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
+majorScaleSteps = {0, 2, 4, 5, 7, 9, 11};
+minorScaleSteps = {0, 2, 3, 5, 7, 8, 10};
 buildScalePCs[tonicPc_, scaleType_] := Mod[tonicPc + If[scaleType == "minor", minorScaleSteps, majorScaleSteps], 12];
 
 scoreKeyFit[pcs_, w_, tonicPc_, scaleType_] := Module[{scalePcs, inScaleW, tonicW},
@@ -142,6 +160,7 @@ flattenChordTemplates[] := Flatten[KeyValueMap[Function[{cat, assoc}, KeyValueMa
 chordNameFor[rootPc_, quality_] := noteNameForPc[rootPc] <> quality;
 
 preferredChordCategories = List["Triads", "Sevenths"];
+preferredChordCategories = {"Triads", "Sevenths"};
 categoryBias = <|"Triads" -> 0.35, "Sevenths" -> 0.22, "Sixths" -> -0.12, "Ninths" -> -0.22|>;
 
 buildRootedCandidates[allowedCategories_:All] := Module[{templates},
@@ -311,6 +330,7 @@ normalizePredPitch[predPitchRaw_, origPitch_] := Module[{candidate = predPitchRa
 (* ---------- Select and normalize target window ---------- *)
 encodedPiece = selected["EncodedNotesV1"];
 pieceRaw = sanitizeRawRows[encodedToStartTimes[encodedPiece]];
+pieceRaw = encodedToStartTimes[encodedPiece];
 
 windowRawAbsolute = Select[pieceRaw, startSec <= #[[1]] <= endSec &];
 If[Length[windowRawAbsolute] < 8,
@@ -325,6 +345,8 @@ If[Length[sanitizeRawRows[windowRawAbsolute]] < 8,
 
 windowOffset = Min[windowRawAbsolute[[All, 1]]];
 windowRaw = SortBy[sanitizeRawRows[windowRawAbsolute], First];
+windowOffset = Min[windowRawAbsolute[[All, 1]]];
+windowRaw = windowRawAbsolute;
 windowRaw[[All, 1]] = windowRaw[[All, 1]] - windowOffset;
 windowDuration = Max[windowRaw[[All, 1]] + windowRaw[[All, 2]]];
 
