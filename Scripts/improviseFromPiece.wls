@@ -96,6 +96,20 @@ startTimesToEncoded[raw_] := Module[{sorted, starts, durations, volumes, pitches
 ];
 
 (* ---------- Chord/key helpers ---------- *)
+chordHelperSymbols = {
+  noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
+ClearAll[noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
+  scoreKeyFit, detectKeyFromPcs, chordTemplateCategories, flattenChordTemplates,
+  chordNameFor, buildRootedCandidates, overlapWeight, barWindows, estimateBeatsPerBar,
+  estimateBeatSeconds, scoreChordCandidate, bestChordForWindow, chordTimelineForWindow,
+  chooseStableChordForWindow, buildStableChordTimeline, preferredChordCategories,
+  categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch,
+  keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch
+};
+Scan[ClearAll, chordHelperSymbols];
+  categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
+  categoryBias, globalKeyProfileFromWindow, nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
+
 noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 -> "F#", 7 -> "G", 8 -> "Ab", 9 -> "A", 10 -> "Bb", 11 -> "B"|>;
 noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
 majorScaleSteps = {0, 2, 4, 5, 7, 9, 11};
@@ -311,6 +325,7 @@ normalizePredPitch[predPitchRaw_, origPitch_] := Module[{candidate = predPitchRa
 (* ---------- Select and normalize target window ---------- *)
 encodedPiece = selected["EncodedNotesV1"];
 pieceRaw = sanitizeRawRows[encodedToStartTimes[encodedPiece]];
+pieceRaw = encodedToStartTimes[encodedPiece];
 
 windowRawAbsolute = Select[pieceRaw, startSec <= #[[1]] <= endSec &];
 If[Length[windowRawAbsolute] < 8,
@@ -325,6 +340,8 @@ If[Length[sanitizeRawRows[windowRawAbsolute]] < 8,
 
 windowOffset = Min[windowRawAbsolute[[All, 1]]];
 windowRaw = SortBy[sanitizeRawRows[windowRawAbsolute], First];
+windowOffset = Min[windowRawAbsolute[[All, 1]]];
+windowRaw = windowRawAbsolute;
 windowRaw[[All, 1]] = windowRaw[[All, 1]] - windowOffset;
 windowDuration = Max[windowRaw[[All, 1]] + windowRaw[[All, 2]]];
 
