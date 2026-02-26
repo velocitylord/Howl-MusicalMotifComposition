@@ -154,6 +154,13 @@ The script estimates bar windows and emits chord/key per bar in `analysisJson`:
 
 This gives practical bar-by-bar harmonic context for constrained pitch projection.
 
+### Troubleshooting
+
+- If you see errors mentioning `NumericArray::lend`, `Part::partw`, or `NetGraph::incseqlen`, pull the latest branch version of `Scripts/improviseFromPiece.wls`.
+  - Recent fixes normalize predictor outputs (`NotesPred` / `NoteDataPred`) before blending so rework data stays valid numeric lists.
+- If you see `Multiple matches found. Using first: ...`, your `pieceQuery` matched more than one file. Use a more specific query string.
+- If the output MIDI is unexpectedly short, inspect the generated `analysisJson` and confirm the selected timestamp window includes enough notes and that predictor loading succeeded.
+
 Also, check out [this helpful guide][1] for information about modeling sequential data with neural nets - if you want to dive in deep and make your own generator.
 
 [1]: https://www.wolfram.com/language/12/neural-network-framework/train-a-net-to-model-english.html?product=mathematica
