@@ -157,6 +157,8 @@ This gives practical bar-by-bar harmonic context for constrained pitch projectio
 
 ### Troubleshooting
 
+- If you see errors mentioning `NumericArray::lend`, `Part::partw`, `Export::jsonstrictencoding`, or `NetGraph::incseqlen`, pull the latest branch version of `Scripts/improviseFromPiece.wls`.
+  - Recent fixes normalize predictor outputs (`NotesPred` / `NoteDataPred`) before blending and sanitize non-scalar imported note rows so rework data stays valid numeric lists.
 - If you see errors mentioning `NumericArray::lend`, `Part::partw`, or `NetGraph::incseqlen`, pull the latest branch version of `Scripts/improviseFromPiece.wls`.
   - Recent fixes normalize predictor outputs (`NotesPred` / `NoteDataPred`) before blending so rework data stays valid numeric lists.
 - If you see `Multiple matches found. Using first: ...`, your `pieceQuery` matched more than one file. Use a more specific query string.
