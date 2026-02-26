@@ -100,7 +100,7 @@ ClearAll[noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScaleP
   scoreKeyFit, detectKeyFromPcs, chordTemplateCategories, flattenChordTemplates,
   chordNameFor, buildRootedCandidates, overlapWeight, barWindows, estimateBeatsPerBar,
   estimateBeatSeconds, scoreChordCandidate, bestChordForWindow, chordTimelineForWindow,
-  nearestAllowedPitch, keyByBar, activeChordAtTime];
+  nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
 
 noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 -> "F#", 7 -> "G", 8 -> "Ab", 9 -> "A", 10 -> "Bb", 11 -> "B"|>;
 noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
@@ -239,6 +239,20 @@ nearestAllowedPitch[candidatePitch_, originalPitch_, allowedPcs_] := Module[{oct
   First[sorted]
 ];
 
+normalizePredNoteData[predDataRaw_, origData_] := Module[{candidate = predDataRaw, asList},
+  asList = Which[
+    FailureQ[candidate] || candidate === $Failed, origData,
+    Head[candidate] === NumericArray, Normal[candidate],
+    ListQ[candidate], candidate,
+    True, origData
+  ];
+  If[!ListQ[asList] || Length[asList] != 3 || !And @@ (NumericQ /@ asList), origData, N[asList]]
+];
+
+normalizePredPitch[predPitchRaw_, origPitch_] := Module[{candidate = predPitchRaw},
+  If[FailureQ[candidate] || candidate === $Failed || !NumericQ[candidate], origPitch, Round[candidate]]
+];
+
 (* ---------- Select and normalize target window ---------- *)
 encodedPiece = selected["EncodedNotesV1"];
 pieceRaw = encodedToStartTimes[encodedPiece];
@@ -272,7 +286,7 @@ barKeyTimeline = keyByBar[windowRaw, #] & /@ bars;
 
 timeline = MapThread[Join[#1, <|"Key" -> #2["Name"]|>] &, {barChordTimeline, barKeyTimeline}];
 
-Print["Detected bars: ", Length[timeline], " (", NumberForm[barSeconds, {4, 2}], " sec each approx.)"];
+Print["Detected bars: ", Length[timeline], " (", ToString@NumberForm[barSeconds, {4, 2}], " sec each approx.)"];
 Print["Reworking with maxPitchDelta=", maxPitchDelta, ", maxTimingFrac=", maxTimingFrac, ", keepOriginalProb=", keepOriginalProb];
 
 (* ---------- Guided rework loop ---------- *)
@@ -284,29 +298,36 @@ Do[
   origPitch = origNotes[[i]];
   origData = origNoteData[[i]];
 
-  pred = predictor[<|"Notes" -> rewriteNotes, "NoteData" -> NumericArray[rewriteData, "Real32"]|>];
-  predPitch = pred["NotesPred"];
-  predData = N[pred["NoteDataPred"]];
+  predInput = <|"Notes" -> rewriteNotes, "NoteData" -> NumericArray[rewriteData, "Real32"]|>;
+  predResult = Quiet@Check[predictor[predInput], $Failed];
+
+  predPitchRaw = If[predResult === $Failed || FailureQ[predResult], origPitch, predResult["NotesPred"]];
+  predDataRaw = If[predResult === $Failed || FailureQ[predResult], origData, predResult["NoteDataPred"]];
+
+  predPitch = normalizePredPitch[predPitchRaw, origPitch];
+  predData = normalizePredNoteData[predDataRaw, origData];
 
   keepOriginal = RandomReal[] < keepOriginalProb;
 
   If[keepOriginal,
     newPitch = origPitch;
     newData = origData;,
-    pitchDelta = Clip[Round[predPitch] - Round[origPitch], {-maxPitchDelta, maxPitchDelta}];
+    pitchDelta = Clip[predPitch - Round[origPitch], {-maxPitchDelta, maxPitchDelta}];
     candidatePitch = Round[origPitch] + pitchDelta;
 
     barCtx = activeChordAtTime[Total[rewriteData[[All, 1]]] + origData[[1]], timeline];
-    newPitch = nearestAllowedPitch[candidatePitch, origPitch, barCtx["PCs"]];
+    allowedPcs = If[AssociationQ[barCtx] && KeyExistsQ[barCtx, "PCs"], barCtx["PCs"], {}];
+    newPitch = nearestAllowedPitch[candidatePitch, origPitch, allowedPcs];
+    newPitch = Clip[newPitch, {-60, 59}];
 
     dataBlend = (1 - blendAlpha) origData + blendAlpha predData;
     newDelay = Clip[dataBlend[[1]], {origData[[1]]*(1 - maxTimingFrac), origData[[1]]*(1 + maxTimingFrac)}];
     newDur = Clip[dataBlend[[2]], {origData[[2]]*(1 - maxTimingFrac), origData[[2]]*(1 + maxTimingFrac)}];
     newVol = Clip[dataBlend[[3]], {Max[0.2, origData[[3]] - 0.25], Min[1.0, origData[[3]] + 0.25]}];
-    newData = {newDelay, newDur, newVol};
+    newData = N[{newDelay, newDur, newVol}];
   ];
 
-  AppendTo[rewriteNotes, newPitch];
+  AppendTo[rewriteNotes, Round[newPitch]];
   AppendTo[rewriteData, newData];
 , {i, Length[rewriteNotes] + 1, Length[origNotes]}];
 
