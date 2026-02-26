@@ -142,7 +142,7 @@ The script includes categorized chord templates for harmonic projection:
 - **Sevenths:** dominant 7, major 7, minor 7, minor-major 7, half-diminished 7, diminished 7, 7sus4, augmented 7, augmented-major 7
 - **Ninths:** add9, minor add9, dominant 9, major 9, minor 9, 9sus4
 
-These templates are expanded over all 12 roots and used to pick the best chord per bar.
+These templates are expanded over all 12 roots, but rework projection now prefers a stabilized subset (`Triads`, `Sevenths`) to reduce noisy harmony flips.
 
 ### Bar-level key/chord timeline
 
@@ -151,8 +151,9 @@ The script estimates bar windows and emits chord/key per bar in `analysisJson`:
 - It estimates beat length from note onsets in the selected window.
 - It tries to read MIDI time signature metadata and uses the numerator when available.
 - If metadata is unavailable, it falls back to **4/4-like** behavior.
+- It detects one global key profile over the selected window and applies continuity-biased chord scoring bar-to-bar.
 
-This gives practical bar-by-bar harmonic context for constrained pitch projection.
+This gives practical bar-by-bar harmonic context for constrained pitch projection with better stability.
 
 ### Troubleshooting
 

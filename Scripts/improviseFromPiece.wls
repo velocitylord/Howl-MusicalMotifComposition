@@ -100,7 +100,8 @@ ClearAll[noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScaleP
   scoreKeyFit, detectKeyFromPcs, chordTemplateCategories, flattenChordTemplates,
   chordNameFor, buildRootedCandidates, overlapWeight, barWindows, estimateBeatsPerBar,
   estimateBeatSeconds, scoreChordCandidate, bestChordForWindow, chordTimelineForWindow,
-  nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
+  chooseStableChordForWindow, buildStableChordTimeline, preferredChordCategories,
+  categoryBias, globalKeyProfileFromWindow, nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
 
 noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 -> "F#", 7 -> "G", 8 -> "Ab", 9 -> "A", 10 -> "Bb", 11 -> "B"|>;
 noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
@@ -147,7 +148,13 @@ flattenChordTemplates[] := Flatten[KeyValueMap[Function[{cat, assoc}, KeyValueMa
 
 chordNameFor[rootPc_, quality_] := noteNameForPc[rootPc] <> quality;
 
-buildRootedCandidates[] := Flatten@Table[
+preferredChordCategories = {"Triads", "Sevenths"};
+categoryBias = <|"Triads" -> 0.35, "Sevenths" -> 0.22, "Sixths" -> -0.12, "Ninths" -> -0.22|>;
+
+buildRootedCandidates[allowedCategories_:All] := Module[{templates},
+  templates = flattenChordTemplates[];
+  If[allowedCategories =!= All, templates = Select[templates, MemberQ[allowedCategories, #["Category"]] &]];
+  Flatten@Table[
   <|
     "RootPC" -> root,
     "Category" -> template["Category"],
@@ -155,7 +162,8 @@ buildRootedCandidates[] := Flatten@Table[
     "PCs" -> Mod[root + template["PCs"], 12],
     "Label" -> chordNameFor[root, template["Quality"]]
   |>,
-  {template, flattenChordTemplates[]}, {root, 0, 11}
+  {template, templates}, {root, 0, 11}
+  ]
 ];
 
 overlapWeight[note_, windowStart_, windowEnd_] := Module[{noteStart, noteEnd, overlapSec, vol},
@@ -210,11 +218,11 @@ bestChordForWindow[rawNotes_, win_, rootedCandidates_] := Module[{notesInWindow,
   notesInWindow = Select[rawNotes, (#[[1]] < win["End"]) && (#[[1]] + #[[2]] > win["Start"]) &];
   weighted = If[Length[notesInWindow] == 0, {}, Map[Append[#, overlapWeight[#, win["Start"], win["End"]]] &, notesInWindow]];
   If[Length[weighted] == 0,
-    Return[<|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> "N.C.", "Category" -> "None", "PCs" -> {}|>]
+    Return[<|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> "N.C.", "Category" -> "None", "PCs" -> {}, "RootPC" -> Missing["None"], "Score" -> -Infinity|>]
   ];
   scored = Map[Append[#, "Score" -> scoreChordCandidate[weighted, #]] &, rootedCandidates];
   best = First@MaximalBy[scored, # ["Score"] &];
-  <|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> best["Label"], "Category" -> best["Category"], "PCs" -> best["PCs"]|>
+  <|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> best["Label"], "Category" -> best["Category"], "PCs" -> best["PCs"], "RootPC" -> best["RootPC"], "Score" -> best["Score"]|>
 ];
 
 keyByBar[rawNotes_, win_] := Module[{notesInWindow, weighted, pcs, w},
@@ -224,6 +232,55 @@ keyByBar[rawNotes_, win_] := Module[{notesInWindow, weighted, pcs, w},
   pcs = Mod[weighted[[All, 4]], 12];
   w = weighted[[All, 5]];
   detectKeyFromPcs[pcs, w]
+];
+
+globalKeyProfileFromWindow[rawNotes_] := Module[{weights, pcs},
+  If[Length[rawNotes] == 0, Return[<|"Name" -> "Unknown", "ScalePCs" -> {}|>]];
+  pcs = Mod[rawNotes[[All, 4]], 12];
+  weights = rawNotes[[All, 2]]*(0.7 + 0.3*rawNotes[[All, 3]]);
+  detectKeyFromPcs[pcs, weights]
+];
+
+chooseStableChordForWindow[rawNotes_, win_, rootedCandidates_, keyProfile_, prevChord_:None] := Module[
+  {notesInWindow, weighted, scored, scoredAdjusted, keyScale, best},
+  notesInWindow = Select[rawNotes, (#[[1]] < win["End"]) && (#[[1]] + #[[2]] > win["Start"]) &];
+  weighted = If[Length[notesInWindow] == 0, {}, Map[Append[#, overlapWeight[#, win["Start"], win["End"]]] &, notesInWindow]];
+  If[Length[weighted] == 0,
+    Return[<|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> "N.C.", "Category" -> "None", "PCs" -> {}, "RootPC" -> Missing["None"], "Score" -> -Infinity|>]
+  ];
+
+  keyScale = If[AssociationQ[keyProfile] && KeyExistsQ[keyProfile, "ScalePCs"], keyProfile["ScalePCs"], {}];
+  scored = Map[Append[#, "Score" -> scoreChordCandidate[weighted, #]] &, rootedCandidates];
+
+  scoredAdjusted = Map[
+    Function[cand,
+      Module[{adj = cand["Score"], shared = 0, continuityBonus = 0},
+        adj += Lookup[categoryBias, cand["Category"], 0.0];
+        If[Length[keyScale] > 0 && MemberQ[keyScale, cand["RootPC"]], adj += 0.18];
+        If[AssociationQ[prevChord] && KeyExistsQ[prevChord, "RootPC"] && NumericQ[prevChord["RootPC"]],
+          If[cand["RootPC"] == prevChord["RootPC"], continuityBonus += 0.32];
+          If[KeyExistsQ[prevChord, "PCs"],
+            shared = Length[Intersection[cand["PCs"], prevChord["PCs"]]];
+            continuityBonus += 0.04*shared
+          ];
+        ];
+        Join[cand, <|"AdjustedScore" -> (adj + continuityBonus)|>]
+      ]
+    ],
+    scored
+  ];
+
+  best = First@MaximalBy[scoredAdjusted, # ["AdjustedScore"] &];
+  <|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> best["Label"], "Category" -> best["Category"], "PCs" -> best["PCs"], "RootPC" -> best["RootPC"], "Score" -> best["AdjustedScore"]|>
+];
+
+buildStableChordTimeline[rawNotes_, bars_, rootedCandidates_, keyProfile_] := Module[{timeline = {}, prev = None, chosen},
+  Do[
+    chosen = chooseStableChordForWindow[rawNotes, win, rootedCandidates, keyProfile, prev];
+    AppendTo[timeline, chosen];
+    If[chosen["Category"] =!= "None", prev = chosen];
+  , {win, bars}];
+  timeline
 ];
 
 activeChordAtTime[t_, timeline_] := Module[{match},
@@ -279,12 +336,11 @@ beatSeconds = estimateBeatSeconds[windowRaw];
 beatsPerBar = estimateBeatsPerBar[selected["File"]];
 barSeconds = Max[0.4, beatSeconds*beatsPerBar];
 bars = barWindows[0, windowDuration, barSeconds];
-rootedCandidates = buildRootedCandidates[];
+globalKeyProfile = globalKeyProfileFromWindow[windowRaw];
+rootedCandidates = buildRootedCandidates[preferredChordCategories];
 
-barChordTimeline = bestChordForWindow[windowRaw, #, rootedCandidates] & /@ bars;
-barKeyTimeline = keyByBar[windowRaw, #] & /@ bars;
-
-timeline = MapThread[Join[#1, <|"Key" -> #2["Name"]|>] &, {barChordTimeline, barKeyTimeline}];
+barChordTimeline = buildStableChordTimeline[windowRaw, bars, rootedCandidates, globalKeyProfile];
+timeline = Map[Join[#, <|"Key" -> globalKeyProfile["Name"]|>] &, barChordTimeline];
 
 Print["Detected bars: ", Length[timeline], " (", ToString@NumberForm[barSeconds, {4, 2}], " sec each approx.)"];
 Print["Reworking with maxPitchDelta=", maxPitchDelta, ", maxTimingFrac=", maxTimingFrac, ", keepOriginalProb=", keepOriginalProb];
@@ -342,6 +398,8 @@ analysis = <|
   "EstimatedBeatSeconds" -> beatSeconds,
   "EstimatedBeatsPerBar" -> beatsPerBar,
   "EstimatedBarSeconds" -> barSeconds,
+  "GlobalKey" -> globalKeyProfile["Name"],
+  "PreferredChordCategories" -> preferredChordCategories,
   "ChordTemplateCategories" -> chordTemplateCategories,
   "BarTimeline" -> timeline
 |>;
