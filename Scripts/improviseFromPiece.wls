@@ -96,11 +96,17 @@ startTimesToEncoded[raw_] := Module[{sorted, starts, durations, volumes, pitches
 ];
 
 (* ---------- Chord/key helpers ---------- *)
+chordHelperSymbols = {
+  noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
 ClearAll[noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
   scoreKeyFit, detectKeyFromPcs, chordTemplateCategories, flattenChordTemplates,
   chordNameFor, buildRootedCandidates, overlapWeight, barWindows, estimateBeatsPerBar,
   estimateBeatSeconds, scoreChordCandidate, bestChordForWindow, chordTimelineForWindow,
   chooseStableChordForWindow, buildStableChordTimeline, preferredChordCategories,
+  categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch,
+  keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch
+};
+Scan[ClearAll, chordHelperSymbols];
   categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
   categoryBias, globalKeyProfileFromWindow, nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
 
