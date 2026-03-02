@@ -116,6 +116,7 @@ noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 ->
 noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
 majorScaleSteps = {0, 2, 4, 5, 7, 9, 11};
 minorScaleSteps = {0, 2, 3, 5, 7, 8, 10};
+
 buildScalePCs[tonicPc_, scaleType_] := Mod[tonicPc + If[scaleType == "minor", minorScaleSteps, majorScaleSteps], 12];
 
 scoreKeyFit[pcs_, w_, tonicPc_, scaleType_] := Module[{scalePcs, inScaleW, tonicW},
@@ -215,7 +216,7 @@ scoreChordCandidate[notesInWindow_, candidate_] := Module[{weights, pcs, bassPc,
   If[Length[notesInWindow] == 0, Return[-Infinity]];
   weights = notesInWindow[[All, 5]];
   pcs = Mod[notesInWindow[[All, 4]], 12];
-  bassPc = Mod[First@SortBy[notesInWindow, #[[4]] &][[4]], 12];
+  bassPc = Mod[(First@SortBy[notesInWindow, #[[4]] &])[[4]], 12];
   chordPcs = candidate["PCs"];
   inChord = Total@Pick[weights, MemberQ[chordPcs, #] & /@ pcs, True];
   outChord = Total@Pick[weights, MemberQ[chordPcs, #] & /@ pcs, False];
@@ -327,7 +328,6 @@ normalizePredPitch[predPitchRaw_, origPitch_] := Module[{candidate = predPitchRa
 (* ---------- Select and normalize target window ---------- *)
 encodedPiece = selected["EncodedNotesV1"];
 pieceRaw = sanitizeRawRows[encodedToStartTimes[encodedPiece]];
-pieceRaw = encodedToStartTimes[encodedPiece];
 
 windowRawAbsolute = Select[pieceRaw, startSec <= #[[1]] <= endSec &];
 If[Length[windowRawAbsolute] < 8,
@@ -342,8 +342,6 @@ If[Length[sanitizeRawRows[windowRawAbsolute]] < 8,
 
 windowOffset = Min[windowRawAbsolute[[All, 1]]];
 windowRaw = SortBy[sanitizeRawRows[windowRawAbsolute], First];
-windowOffset = Min[windowRawAbsolute[[All, 1]]];
-windowRaw = windowRawAbsolute;
 windowRaw[[All, 1]] = windowRaw[[All, 1]] - windowOffset;
 windowDuration = Max[windowRaw[[All, 1]] + windowRaw[[All, 2]]];
 
@@ -426,7 +424,8 @@ analysis = <|
   "BarTimeline" -> timeline
 |>;
 
-Export[analysisJson, analysis, "JSON"];
+safeAnalysis = analysis /. {Missing[__] -> "None", DirectedInfinity[_] -> Null, Infinity -> Null, -Infinity -> Null};
+Export[analysisJson, safeAnalysis, "JSON"];
 
 Print["Saved rework MIDI: ", outputMidi];
 Print["Saved bar-by-bar key/chord analysis: ", analysisJson];
