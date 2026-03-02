@@ -98,26 +98,9 @@ startTimesToEncoded[raw_] := Module[{sorted, starts, durations, volumes, pitches
 (* ---------- Chord/key helpers ---------- *)
 noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 -> "F#", 7 -> "G", 8 -> "Ab", 9 -> "A", 10 -> "Bb", 11 -> "B"|>;
 noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
-majorScaleSteps = List[0, 2, 4, 5, 7, 9, 11];
-minorScaleSteps = List[0, 2, 3, 5, 7, 8, 10];
-chordHelperSymbols = {
-  noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
-ClearAll[noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
-  scoreKeyFit, detectKeyFromPcs, chordTemplateCategories, flattenChordTemplates,
-  chordNameFor, buildRootedCandidates, overlapWeight, barWindows, estimateBeatsPerBar,
-  estimateBeatSeconds, scoreChordCandidate, bestChordForWindow, chordTimelineForWindow,
-  chooseStableChordForWindow, buildStableChordTimeline, preferredChordCategories,
-  categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch,
-  keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch
-};
-Scan[ClearAll, chordHelperSymbols];
-  categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
-  categoryBias, globalKeyProfileFromWindow, nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
-
-noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 -> "F#", 7 -> "G", 8 -> "Ab", 9 -> "A", 10 -> "Bb", 11 -> "B"|>;
-noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
 majorScaleSteps = {0, 2, 4, 5, 7, 9, 11};
 minorScaleSteps = {0, 2, 3, 5, 7, 8, 10};
+
 buildScalePCs[tonicPc_, scaleType_] := Mod[tonicPc + If[scaleType == "minor", minorScaleSteps, majorScaleSteps], 12];
 
 scoreKeyFit[pcs_, w_, tonicPc_, scaleType_] := Module[{scalePcs, inScaleW, tonicW},
@@ -159,7 +142,6 @@ flattenChordTemplates[] := Flatten[KeyValueMap[Function[{cat, assoc}, KeyValueMa
 
 chordNameFor[rootPc_, quality_] := noteNameForPc[rootPc] <> quality;
 
-preferredChordCategories = List["Triads", "Sevenths"];
 preferredChordCategories = {"Triads", "Sevenths"};
 categoryBias = <|"Triads" -> 0.35, "Sevenths" -> 0.22, "Sixths" -> -0.12, "Ninths" -> -0.22|>;
 
@@ -218,7 +200,7 @@ scoreChordCandidate[notesInWindow_, candidate_] := Module[{weights, pcs, bassPc,
   If[Length[notesInWindow] == 0, Return[-Infinity]];
   weights = notesInWindow[[All, 5]];
   pcs = Mod[notesInWindow[[All, 4]], 12];
-  bassPc = Mod[First@SortBy[notesInWindow, #[[4]] &][[4]], 12];
+  bassPc = Mod[(First@SortBy[notesInWindow, #[[4]] &])[[4]], 12];
   chordPcs = candidate["PCs"];
   inChord = Total@Pick[weights, MemberQ[chordPcs, #] & /@ pcs, True];
   outChord = Total@Pick[weights, MemberQ[chordPcs, #] & /@ pcs, False];
@@ -330,7 +312,6 @@ normalizePredPitch[predPitchRaw_, origPitch_] := Module[{candidate = predPitchRa
 (* ---------- Select and normalize target window ---------- *)
 encodedPiece = selected["EncodedNotesV1"];
 pieceRaw = sanitizeRawRows[encodedToStartTimes[encodedPiece]];
-pieceRaw = encodedToStartTimes[encodedPiece];
 
 windowRawAbsolute = Select[pieceRaw, startSec <= #[[1]] <= endSec &];
 If[Length[windowRawAbsolute] < 8,
@@ -345,8 +326,6 @@ If[Length[sanitizeRawRows[windowRawAbsolute]] < 8,
 
 windowOffset = Min[windowRawAbsolute[[All, 1]]];
 windowRaw = SortBy[sanitizeRawRows[windowRawAbsolute], First];
-windowOffset = Min[windowRawAbsolute[[All, 1]]];
-windowRaw = windowRawAbsolute;
 windowRaw[[All, 1]] = windowRaw[[All, 1]] - windowOffset;
 windowDuration = Max[windowRaw[[All, 1]] + windowRaw[[All, 2]]];
 
@@ -429,7 +408,8 @@ analysis = <|
   "BarTimeline" -> timeline
 |>;
 
-Export[analysisJson, analysis, "JSON"];
+safeAnalysis = analysis /. {Missing[__] -> "None", DirectedInfinity[_] -> Null, Infinity -> Null, -Infinity -> Null};
+Export[analysisJson, safeAnalysis, "JSON"];
 
 Print["Saved rework MIDI: ", outputMidi];
 Print["Saved bar-by-bar key/chord analysis: ", analysisJson];
