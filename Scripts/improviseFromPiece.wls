@@ -101,6 +101,22 @@ noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
 majorScaleSteps = {0, 2, 4, 5, 7, 9, 11};
 minorScaleSteps = {0, 2, 3, 5, 7, 8, 10};
 
+chordHelperSymbols = {
+  noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
+  scoreKeyFit, detectKeyFromPcs, chordTemplateCategories, flattenChordTemplates,
+  chordNameFor, buildRootedCandidates, overlapWeight, barWindows, estimateBeatsPerBar,
+  estimateBeatSeconds, scoreChordCandidate, bestChordForWindow, chordTimelineForWindow,
+  chooseStableChordForWindow, buildStableChordTimeline, preferredChordCategories,
+  categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch,
+  keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch
+};
+Scan[ClearAll, chordHelperSymbols];
+
+noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 -> "F#", 7 -> "G", 8 -> "Ab", 9 -> "A", 10 -> "Bb", 11 -> "B"|>;
+noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
+majorScaleSteps = {0, 2, 4, 5, 7, 9, 11};
+minorScaleSteps = {0, 2, 3, 5, 7, 8, 10};
+
 buildScalePCs[tonicPc_, scaleType_] := Mod[tonicPc + If[scaleType == "minor", minorScaleSteps, majorScaleSteps], 12];
 
 scoreKeyFit[pcs_, w_, tonicPc_, scaleType_] := Module[{scalePcs, inScaleW, tonicW},
