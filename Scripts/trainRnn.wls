@@ -110,7 +110,7 @@ rnn = NetGraph[
     "Stack" -> CatenateLayer[2],
     "Vectorize" -> UnitVectorLayer[],
     "LSTM" -> NetChain[{
-      LongShortTermMemoryLayer[192]
+      LongShortTermMemoryLayer[256]
     }],
     "OutputProcessing" -> NetMapOperator@buildProcessingGraph[1],
     "NoteDecoder" -> NetMapOperator@NetChain[{
@@ -222,12 +222,12 @@ trainingResults = NetTrain[
   ValidationSet -> valset,
   LossFunction -> "Loss",
   TrainingProgressCheckpointing-> {
-    "Directory", checkpointDir, "Interval"->Quantity[2,"Hours"]
+    "Directory", checkpointDir, "Interval"->Quantity[1,"Hours"]
   },
   TargetDevice -> "CPU",
-  BatchSize -> 8,
+  BatchSize -> 16,
   WorkingPrecision -> "Real32",
-  TimeGoal -> Quantity[1, "Hours"]
+  TimeGoal -> Quantity[12, "Hours"]
 ];
 
 
