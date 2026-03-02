@@ -311,6 +311,32 @@ nearestAllowedPitch[candidatePitch_, originalPitch_, allowedPcs_] := Module[{oct
   First[sorted]
 ];
 
+
+buildChordVoicing[rootPc_, pcs_] := Module[{normalized, rel, orderedRel, picked, bass, mid, top},
+  normalized = Sort[DeleteDuplicates[Mod[pcs, 12]]];
+  If[Length[normalized] < 3,
+    normalized = Sort[DeleteDuplicates@Join[normalized, Mod[rootPc + {0, 4, 7}, 12]]]
+  ];
+  rel = Mod[normalized - rootPc, 12];
+  orderedRel = SortBy[rel, {# =!= 0 &, #} &];
+  picked = Take[orderedRel, UpTo[3]];
+  If[Length[picked] < 3, picked = PadRight[picked, 3, Last[picked]]];
+  bass = -24 + rootPc;
+  mid = -12 + rootPc + picked[[2]];
+  top = -12 + rootPc + picked[[3]];
+  Clip[Round /@ {bass, mid, top}, {-60, 59}]
+];
+
+buildChordBackingRaw[timeline_, windowDuration_] := Module[{rows = {}, chordBars, voicing, dur},
+  chordBars = Select[timeline, KeyExistsQ[#, "PCs"] && Length[# ["PCs"]] >= 3 &];
+  Do[
+    dur = Max[0.2, Min[ch["End"], windowDuration] - ch["Start"]];
+    voicing = buildChordVoicing[ch["RootPC"], ch["PCs"]];
+    rows = Join[rows, ({ch["Start"], 0.92 dur, 0.52, #} & /@ voicing)];
+  , {ch, chordBars}];
+  SortBy[rows, First]
+];
+
 normalizePredNoteData[predDataRaw_, origData_] := Module[{candidate = predDataRaw, asList},
   asList = Which[
     FailureQ[candidate] || candidate === $Failed, origData,
@@ -408,7 +434,12 @@ Do[
 , {i, Length[rewriteNotes] + 1, Length[origNotes]}];
 
 reworkedEncoded = Transpose@{rewriteData[[All, 1]], rewriteData[[All, 2]], rewriteData[[All, 3]], rewriteNotes};
-reworkedNotes = HowlDecodeNotesV1[reworkedEncoded];
+
+melodyRaw = sanitizeRawRows[encodedToStartTimes[reworkedEncoded]];
+chordBackingRaw = buildChordBackingRaw[timeline, windowDuration];
+combinedRaw = SortBy[Join[melodyRaw, chordBackingRaw], First];
+combinedEncoded = startTimesToEncoded[combinedRaw];
+reworkedNotes = HowlDecodeNotesV1[combinedEncoded];
 
 Export[outputMidi, Sound[reworkedNotes], "MIDI"];
 
@@ -421,7 +452,9 @@ analysis = <|
   "GlobalKey" -> globalKeyProfile["Name"],
   "PreferredChordCategories" -> preferredChordCategories,
   "ChordTemplateCategories" -> chordTemplateCategories,
-  "BarTimeline" -> timeline
+  "BarTimeline" -> timeline,
+  "AccompanimentNoteCount" -> Length[chordBackingRaw],
+  "MelodyNoteCount" -> Length[melodyRaw]
 |>;
 
 safeAnalysis = analysis /. {Missing[__] -> "None", DirectedInfinity[_] -> Null, Infinity -> Null, -Infinity -> Null};
