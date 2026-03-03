@@ -74,12 +74,12 @@ If[FailureQ[predictor],
 
 validDataset = Select[
   dataset,
-  AssociationQ[#] && KeyExistsQ[#, "File"] && KeyExistsQ[#, "EncodedNotesV1"] && !FailureQ[# ["EncodedNotesV1"]] &
+  AssociationQ[#] && KeyExistsQ[#, "File"] && KeyExistsQ[#, "EncodedNotesV1"] && !FailureQ[#["EncodedNotesV1"]] &
 ];
 
 matches = Select[
   validDataset,
-  StringContainsQ[ToLowerCase[FileNameTake[# ["File"]]], ToLowerCase[pieceQuery]] &
+  StringContainsQ[ToLowerCase[FileNameTake[#["File"]]], ToLowerCase[pieceQuery]] &
 ];
 
 If[Length[matches] == 0,
@@ -141,7 +141,7 @@ detectKeyFromPcs[pcs_, weights_] := Module[{candidates, best},
     <|"TonicPC" -> tonic, "ScaleType" -> scale, "Score" -> scoreKeyFit[pcs, weights, tonic, scale]|>,
     {scale, {"major", "minor"}}, {tonic, 0, 11}
   ];
-  best = First@MaximalBy[candidates, # ["Score"] &];
+  best = First@MaximalBy[candidates, #["Score"] &];
   Join[best, <|"Name" -> (noteNameForPc[best["TonicPC"]] <> " " <> best["ScaleType"]), "ScalePCs" -> buildScalePCs[best["TonicPC"], best["ScaleType"]]|>]
 ];
 
@@ -219,7 +219,7 @@ estimateBeatsPerBar[file_] := Module[{sigCandidates, firstSig},
 barWindows[startT_, endT_, barSeconds_] := Module[{bars, barStarts},
   barStarts = Range[Floor[startT/barSeconds]*barSeconds, endT, barSeconds];
   bars = Map[<|"Start" -> #, "End" -> Min[# + barSeconds, endT]|> &, barStarts];
-  Select[bars, # ["End"] > startT &]
+  Select[bars, #["End"] > startT &]
 ];
 
 scoreChordCandidate[notesInWindow_, candidate_] := Module[{weights, pcs, bassPc, chordPcs, inChord, outChord, bassBonus},
@@ -241,7 +241,7 @@ bestChordForWindow[rawNotes_, win_, rootedCandidates_] := Module[{notesInWindow,
     Return[<|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> "N.C.", "Category" -> "None", "PCs" -> {}, "RootPC" -> Missing["None"], "Score" -> -Infinity|>]
   ];
   scored = Map[Append[#, "Score" -> scoreChordCandidate[weighted, #]] &, rootedCandidates];
-  best = First@MaximalBy[scored, # ["Score"] &];
+  best = First@MaximalBy[scored, #["Score"] &];
   <|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> best["Label"], "Category" -> best["Category"], "PCs" -> best["PCs"], "RootPC" -> best["RootPC"], "Score" -> best["Score"]|>
 ];
 
@@ -295,7 +295,7 @@ chooseStableChordForWindow[rawNotes_, win_, rootedCandidates_, keyProfile_, prev
     scored
   ];
 
-  best = First@MaximalBy[scoredAdjusted, # ["AdjustedScore"] &];
+  best = First@MaximalBy[scoredAdjusted, #["AdjustedScore"] &];
   <|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> best["Label"], "Category" -> best["Category"], "PCs" -> best["PCs"], "RootPC" -> best["RootPC"], "Score" -> best["AdjustedScore"]|>
 ];
 
@@ -309,7 +309,7 @@ buildStableChordTimeline[rawNotes_, bars_, rootedCandidates_, keyProfile_] := Mo
 ];
 
 activeChordAtTime[t_, timeline_] := Module[{match},
-  match = SelectFirst[timeline, # ["Start"] <= t < # ["End"] &];
+  match = SelectFirst[timeline, #["Start"] <= t < #["End"] &];
   If[match === Missing["NotFound"], Last[timeline], match]
 ];
 
