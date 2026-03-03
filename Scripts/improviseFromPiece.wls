@@ -101,6 +101,22 @@ noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
 majorScaleSteps = {0, 2, 4, 5, 7, 9, 11};
 minorScaleSteps = {0, 2, 3, 5, 7, 8, 10};
 
+chordHelperSymbols = {
+  noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
+  scoreKeyFit, detectKeyFromPcs, chordTemplateCategories, flattenChordTemplates,
+  chordNameFor, buildRootedCandidates, overlapWeight, barWindows, estimateBeatsPerBar,
+  estimateBeatSeconds, scoreChordCandidate, bestChordForWindow, chordTimelineForWindow,
+  chooseStableChordForWindow, buildStableChordTimeline, preferredChordCategories,
+  categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch,
+  keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch
+};
+Scan[ClearAll, chordHelperSymbols];
+
+noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 -> "F#", 7 -> "G", 8 -> "Ab", 9 -> "A", 10 -> "Bb", 11 -> "B"|>;
+noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
+majorScaleSteps = {0, 2, 4, 5, 7, 9, 11};
+minorScaleSteps = {0, 2, 3, 5, 7, 8, 10};
+
 buildScalePCs[tonicPc_, scaleType_] := Mod[tonicPc + If[scaleType == "minor", minorScaleSteps, majorScaleSteps], 12];
 
 scoreKeyFit[pcs_, w_, tonicPc_, scaleType_] := Module[{scalePcs, inScaleW, tonicW},
@@ -346,6 +362,31 @@ reharmonizeHarmonyRaw[harmonyRows_, melodyRaw_, timeline_] := Module[{out = {}, 
 
 
 
+buildChordVoicing[rootPc_, pcs_] := Module[{normalized, rel, orderedRel, picked, bass, mid, top},
+  normalized = Sort[DeleteDuplicates[Mod[pcs, 12]]];
+  If[Length[normalized] < 3,
+    normalized = Sort[DeleteDuplicates@Join[normalized, Mod[rootPc + {0, 4, 7}, 12]]]
+  ];
+  rel = Mod[normalized - rootPc, 12];
+  orderedRel = SortBy[rel, {# =!= 0 &, #} &];
+  picked = Take[orderedRel, UpTo[3]];
+  If[Length[picked] < 3, picked = PadRight[picked, 3, Last[picked]]];
+  bass = -24 + rootPc;
+  mid = -12 + rootPc + picked[[2]];
+  top = -12 + rootPc + picked[[3]];
+  Clip[Round /@ {bass, mid, top}, {-60, 59}]
+];
+
+buildChordBackingRaw[timeline_, windowDuration_] := Module[{rows = {}, chordBars, voicing, dur},
+  chordBars = Select[timeline, KeyExistsQ[#, "PCs"] && Length[# ["PCs"]] >= 3 &];
+  Do[
+    dur = Max[0.2, Min[ch["End"], windowDuration] - ch["Start"]];
+    voicing = buildChordVoicing[ch["RootPC"], ch["PCs"]];
+    rows = Join[rows, ({ch["Start"], 0.92 dur, 0.52, #} & /@ voicing)];
+  , {ch, chordBars}];
+  SortBy[rows, First]
+];
+
 normalizePredNoteData[predDataRaw_, origData_] := Module[{candidate = predDataRaw, asList},
   asList = Which[
     FailureQ[candidate] || candidate === $Failed, origData,
@@ -452,6 +493,11 @@ reworkedMelodyEncoded = Transpose@{rewriteData[[All, 1]], rewriteData[[All, 2]],
 reworkedMelodyRaw = sanitizeRawRows[encodedToStartTimes[reworkedMelodyEncoded]];
 reworkedHarmonyRaw = reharmonizeHarmonyRaw[harmonyRaw, reworkedMelodyRaw, timeline];
 combinedRaw = SortBy[Join[reworkedMelodyRaw, reworkedHarmonyRaw], First];
+reworkedEncoded = Transpose@{rewriteData[[All, 1]], rewriteData[[All, 2]], rewriteData[[All, 3]], rewriteNotes};
+
+melodyRaw = sanitizeRawRows[encodedToStartTimes[reworkedEncoded]];
+chordBackingRaw = buildChordBackingRaw[timeline, windowDuration];
+combinedRaw = SortBy[Join[melodyRaw, chordBackingRaw], First];
 combinedEncoded = startTimesToEncoded[combinedRaw];
 reworkedNotes = HowlDecodeNotesV1[combinedEncoded];
 
@@ -469,6 +515,8 @@ analysis = <|
   "BarTimeline" -> timeline,
   "HarmonyNoteCount" -> Length[reworkedHarmonyRaw],
   "MelodyNoteCount" -> Length[reworkedMelodyRaw]
+  "AccompanimentNoteCount" -> Length[chordBackingRaw],
+  "MelodyNoteCount" -> Length[melodyRaw]
 |>;
 
 safeAnalysis = analysis /. {Missing[__] -> "None", DirectedInfinity[_] -> Null, Infinity -> Null, -Infinity -> Null};
