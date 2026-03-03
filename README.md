@@ -97,6 +97,68 @@ Export["Scripts/generated.mid", Sound[HowlDecodeNotesV1[encoded]], "MIDI"];
 
 This keeps generation close to the original training/predictor pipeline and is usually easiest to debug before adding CLI wrappers.
 
+
+## Short piece generation script (new)
+
+Use `Scripts/generateShortPiece.wls` for a fast notebook-free way to generate a short MIDI from an exported `predictor_*.wlnet`.
+
+```bash
+wolframscript -file Scripts/generateShortPiece.wls \
+  Scripts/checkpoints_xxxx/predictor_yyyy.wlnet \
+  Scripts/generated_short_piece.mid \
+  128 320 1337
+```
+
+Arguments:
+
+1. `predictorFile`
+2. `outputMidi` (optional, default `Scripts/generated_short_piece.mid`)
+3. `steps` (optional, default `128`)
+4. `context` (optional, default `320`)
+5. `seed` (optional, default `1337`)
+
+The script keeps your previous quality constraints (anti-repeat, leap limiting, and timing smoothing), and runs predictor inference on CPU for better compatibility.
+
+## Motif extension with key/chord context (new)
+
+Use `Scripts/extendMotifWithContext.wls` to:
+
+- extract an 8-10s motif window from a MIDI piece,
+- detect key/chord context,
+- append a tightly constrained continuation,
+- keep rhythm close to the motif while allowing slight predictor-guided variation.
+
+```bash
+wolframscript -file Scripts/extendMotifWithContext.wls \
+  Scripts/checkpoints_xxxx/predictor_yyyy.wlnet \
+  path/to/motif_piece.mid \
+  12 20 8 \
+  path/to/full_piece_for_analysis.mid \
+  Scripts/motif_extended.mid \
+  Scripts/motif_extended_analysis.json \
+  2 0.08 0.90
+```
+
+Arguments:
+
+1. `predictorFile`
+2. `motifMidi`: MIDI file containing the motif
+3. `motifStartSec`
+4. `motifEndSec`
+5. `extensionSec`: added continuation length in seconds
+6. `analysisMidi` (optional): full piece for key/chord detection (default = `motifMidi`)
+7. `outputMidi` (optional)
+8. `analysisJson` (optional)
+9. `maxPitchDelta` (optional, default `2`)
+10. `timingBlend` (optional, default `0.08`)
+11. `keepMotifRhythm` (optional, default `0.90`)
+
+### Recommended presets for tight motif continuation
+
+- **Very tight (most musical):** `maxPitchDelta=1`, `timingBlend=0.05`, `keepMotifRhythm=0.95`
+- **Balanced:** `maxPitchDelta=2`, `timingBlend=0.08`, `keepMotifRhythm=0.90`
+- **Looser variation:** `maxPitchDelta=3`, `timingBlend=0.12`, `keepMotifRhythm=0.82`
+
 ## Piece + timestamp phrase reinterpretation workflow (new)
 
 `Scripts/reinterpretPhraseWithHarmony.wls` performs a **structured phrase reinterpretation**:
