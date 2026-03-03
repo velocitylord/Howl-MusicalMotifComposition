@@ -118,6 +118,7 @@ Arguments:
 5. `seed` (optional, default `1337`)
 
 The script keeps your previous quality constraints (anti-repeat, leap limiting, and timing smoothing), runs predictor inference on CPU for better compatibility, and now canonicalizes generated note encoding to match `HowlEncodeNotesV1` conventions (delay/duration/volume bounds + octave-thresholded integer pitch).
+The script keeps your previous quality constraints (anti-repeat, leap limiting, and timing smoothing), and runs predictor inference on CPU for better compatibility.
 
 ## Motif extension with key/chord context (new)
 
@@ -127,6 +128,7 @@ Use `Scripts/extendMotifWithContext.wls` to:
 - detect key/chord context,
 - append a tightly constrained continuation,
 - keep rhythm close to the motif while allowing slight predictor-guided variation, with predictor inputs/outputs canonicalized to the same encoding conventions used in dataset creation/training.
+- keep rhythm close to the motif while allowing slight predictor-guided variation.
 
 ```bash
 wolframscript -file Scripts/extendMotifWithContext.wls \
@@ -143,6 +145,7 @@ Arguments:
 
 1. `predictorFile`
 2. `motifMidi`: MIDI file containing the motif (full filename or path prefix without `.mid`/`.midi`)
+2. `motifMidi`: MIDI file containing the motif
 3. `motifStartSec`
 4. `motifEndSec`
 5. `extensionSec`: added continuation length in seconds
