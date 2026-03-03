@@ -110,6 +110,7 @@ This keeps generation close to the original training/predictor pipeline and is u
 
 ```bash
 wolframscript -file Scripts/reinterpretPhraseWithHarmony.wls   Scripts/checkpoints_xxxx/predictor_yyyy.wlnet   Scripts/dataset.wxf   "Ashitaka"   4 25   Scripts/ashitaka_reinterpreted.mid   Scripts/ashitaka_reinterpreted_analysis.json   2   0.65   0.10
+wolframscript -file Scripts/reinterpretPhraseWithHarmony.wls   Scripts/checkpoints_xxxx/predictor_yyyy.wlnet   Scripts/dataset.wxf   "Ashitaka"   4 25   Scripts/ashitaka_reinterpreted.mid   Scripts/ashitaka_reinterpreted_analysis.json   5   0.20   0.30
 ```
 
 Arguments:
@@ -136,6 +137,9 @@ In practice, start with the **safest** setting and only increase variation if it
 ### Can the predictor choose chord progressions?
 
 Not directly in this project. The predictor is used here as a **next-note/melodic suggestion** model; it was not trained as a dedicated chord-progression planner. This workflow therefore keeps harmony grounded by detecting key/chords from the selected phrase and constraining melody edits to that context.
+7. `maxPitchDelta` (optional): max semitone shift from each original melody pitch (default `5`)
+8. `keepOriginalProb` (optional): probability each melody note stays original (default `0.20`)
+9. `timingBlend` (optional): blend factor between original and predicted delay/duration/volume (default `0.30`)
 
 ### Troubleshooting
 

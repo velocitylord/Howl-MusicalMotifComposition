@@ -35,6 +35,9 @@ analysisJson = If[Length[$ScriptCommandLine] >= 8, $ScriptCommandLine[[8]], "Scr
 maxPitchDelta = If[Length[$ScriptCommandLine] >= 9, Interpreter["Integer"][$ScriptCommandLine[[9]]], 2];
 keepOriginalProb = If[Length[$ScriptCommandLine] >= 10, Interpreter["Number"][$ScriptCommandLine[[10]]], 0.65];
 timingBlend = If[Length[$ScriptCommandLine] >= 11, Interpreter["Number"][$ScriptCommandLine[[11]]], 0.10];
+maxPitchDelta = If[Length[$ScriptCommandLine] >= 9, Interpreter["Integer"][$ScriptCommandLine[[9]]], 5];
+keepOriginalProb = If[Length[$ScriptCommandLine] >= 10, Interpreter["Number"][$ScriptCommandLine[[10]]], 0.20];
+timingBlend = If[Length[$ScriptCommandLine] >= 11, Interpreter["Number"][$ScriptCommandLine[[11]]], 0.30];
 
 If[FailureQ[startSec] || FailureQ[endSec] || endSec <= startSec,
   Print["Invalid timestamp range. Example: 6 24"]; Exit[1];
@@ -335,6 +338,15 @@ Do[
     newDelay = Max[0.001, thisOrigData[[1]]];
     newDur = Max[0.05, 0.8*thisOrigData[[2]] + 0.2*mixed[[2]]];
     newVol = Clip[0.75*thisOrigData[[3]] + 0.25*mixed[[3]], {0.2, 1.0}];
+    pitchDelta = Clip[predPitch - Round[thisOrigPitch], {-maxPitchDelta, maxPitchDelta}];
+    candidatePitch = Round[thisOrigPitch] + pitchDelta;
+    newPitch = nearestAllowedPitch[candidatePitch, thisOrigPitch, allowedPcs];
+    newPitch = Clip[newPitch, {-60, 59}];
+
+    mixed = (1 - timingBlend) thisOrigData + timingBlend predData;
+    newDelay = Max[0.001, mixed[[1]]];
+    newDur = Max[0.05, mixed[[2]]];
+    newVol = Clip[mixed[[3]], {0.2, 1.0}];
     newData = N[{newDelay, newDur, newVol}];
   ];
 
@@ -366,6 +378,7 @@ analysis = <|
   "ReinterpretedMelodyNoteCount" -> Length[reworkedMelodyRaw],
   "OutputTotalNoteCount" -> Length[combinedRaw],
   "Settings" -> <|"MaxPitchDelta" -> maxPitchDelta, "KeepOriginalProb" -> keepOriginalProb, "TimingBlend" -> timingBlend|>
+  "OutputTotalNoteCount" -> Length[combinedRaw]
 |>;
 
 safeAnalysis = analysis /. {Missing[__] -> "None", DirectedInfinity[_] -> Null, Infinity -> Null, -Infinity -> Null};
