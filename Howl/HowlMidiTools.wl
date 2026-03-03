@@ -97,6 +97,7 @@ HowlIntToNote[note_Integer] := With[{
   },
   numToKey @ octaveSemitone[[2]]  <> ToString @ octaveSemitone[[1]]
 ];
+HowlIntToNote[note_?NumericQ] := HowlIntToNote[IntegerPart@Round[note]];
 
 Clear[noteSort];
 (*Sort a list of SoundNotes.*)

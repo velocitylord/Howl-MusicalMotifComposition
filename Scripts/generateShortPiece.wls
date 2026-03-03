@@ -31,6 +31,23 @@ SeedRandom[seed];
 predictor = Import[predictorPath];
 If[FailureQ[predictor], Print["Failed to import predictor: ", predictorPath]; Exit[1]];
 
+coercePitch[p_] := HowlNoteToInt[p];
+
+canonicalizeEncoded[enc_] := Module[{clean = N[enc]},
+  If[Length[clean] == 0, Return[clean]];
+  clean[[All, 1]] = Max[0.001, #] & /@ clean[[All, 1]];
+  clean[[All, 2]] = Max[0.05, #] & /@ clean[[All, 2]];
+  clean[[All, 3]] = Clip[#, {0.1, 1.0}] & /@ clean[[All, 3]];
+  clean[[All, 4]] = coercePitch /@ clean[[All, 4]];
+  clean
+];
+
+encToNetInput[encSong_] := With[{clean = canonicalizeEncoded[encSong]}, <|
+  "NoteData" -> NumericArray[clean[[All, 1 ;; 3]], "Real32"],
+  "Notes" -> Round[clean[[All, 4]]]
+|>];
+
+fromPred[pred_, fallback_] := Module[{pData, pNote, row},
 encToNetInput[encSong_] := <|"NoteData" -> N[encSong[[All, 1 ;; 3]]], "Notes" -> Round[encSong[[All, 4]]]|>;
 
 fromPred[pred_, fallback_] := Module[{pData, pNote},
@@ -39,6 +56,8 @@ fromPred[pred_, fallback_] := Module[{pData, pNote},
   If[Head[pData] === NumericArray, pData = Normal[pData]];
   If[!ListQ[pData] || Length[pData] != 3 || !And @@ (NumericQ /@ pData), pData = fallback[[1 ;; 3]]];
   If[!NumericQ[pNote], pNote = fallback[[4]]];
+  row = N@Join[pData, {coercePitch[pNote]}];
+  First@canonicalizeEncoded[{row}]
   N@Join[pData, {Round[pNote]}]
 ];
 
@@ -73,6 +92,9 @@ limitLeapStep[seq_, maxLeap_ : 9] := Module[{out = seq, n = Length[seq], leap},
 
 qualityStep[seq_] := smoothNoteDataStep@limitLeapStep@antiRepeatStep@seq;
 
+sanitizeEncodedForDecode[enc_] := canonicalizeEncoded[enc];
+
+makeMusicShort[predictor_, start_, len_ : 128, ctx_ : 320] := Module[{encoded, generatedSound, pred, input, fallback, cleaned},
 makeMusicShort[predictor_, start_, len_ : 128, ctx_ : 320] := Module[{encoded, generatedSound, pred, input, fallback},
   encoded = Nest[
     Function[curr,
@@ -84,6 +106,8 @@ makeMusicShort[predictor_, start_, len_ : 128, ctx_ : 320] := Module[{encoded, g
     start,
     len
   ];
+  cleaned = sanitizeEncodedForDecode[encoded];
+  generatedSound = Sound[HowlDecodeNotesV1[cleaned]];
   generatedSound = Sound[HowlDecodeNotesV1[encoded]];
   Export[outputMidi, generatedSound, "MIDI"];
   Print["Exported MIDI: ", outputMidi];

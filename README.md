@@ -117,6 +117,7 @@ Arguments:
 4. `context` (optional, default `320`)
 5. `seed` (optional, default `1337`)
 
+The script keeps your previous quality constraints (anti-repeat, leap limiting, and timing smoothing), runs predictor inference on CPU for better compatibility, and now canonicalizes generated note encoding to match `HowlEncodeNotesV1` conventions (delay/duration/volume bounds + octave-thresholded integer pitch).
 The script keeps your previous quality constraints (anti-repeat, leap limiting, and timing smoothing), and runs predictor inference on CPU for better compatibility.
 
 ## Motif extension with key/chord context (new)
@@ -126,6 +127,7 @@ Use `Scripts/extendMotifWithContext.wls` to:
 - extract an 8-10s motif window from a MIDI piece,
 - detect key/chord context,
 - append a tightly constrained continuation,
+- keep rhythm close to the motif while allowing slight predictor-guided variation, with predictor inputs/outputs canonicalized to the same encoding conventions used in dataset creation/training.
 - keep rhythm close to the motif while allowing slight predictor-guided variation.
 
 ```bash
@@ -142,6 +144,7 @@ wolframscript -file Scripts/extendMotifWithContext.wls \
 Arguments:
 
 1. `predictorFile`
+2. `motifMidi`: MIDI file containing the motif (full filename or path prefix without `.mid`/`.midi`)
 2. `motifMidi`: MIDI file containing the motif
 3. `motifStartSec`
 4. `motifEndSec`
@@ -152,6 +155,8 @@ Arguments:
 9. `maxPitchDelta` (optional, default `2`)
 10. `timingBlend` (optional, default `0.08`)
 11. `keepMotifRhythm` (optional, default `0.90`)
+
+Windows tip: wrap full paths with spaces in double quotes. The script will also try to resolve paths when you pass a base name without extension.
 
 ### Recommended presets for tight motif continuation
 
