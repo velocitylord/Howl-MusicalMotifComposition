@@ -220,6 +220,7 @@ encToNetInput[encSong_] := With[{clean = canonicalizeEncoded[encSong]}, <|
   "NoteData" -> NumericArray[clean[[All, 1 ;; 3]], "Real32"],
   "Notes" -> Round[clean[[All, 4]]]
 |>];
+encToNetInput[encSong_] := <|"NoteData" -> N[encSong[[All, 1 ;; 3]]], "Notes" -> Round[encSong[[All, 4]]]|>;
 normalizePredData[pred_, fallback_] := Module[{d = Lookup[pred, "NoteDataPred", fallback]},
   If[Head[d] === NumericArray, d = Normal[d]];
   If[ListQ[d] && Length[d] == 3 && And @@ (NumericQ /@ d), N[d], N[fallback]]
@@ -237,6 +238,13 @@ If[FailureQ[motifImported["Notes"]], Print["Failed to import motif MIDI: ", moti
 
 analysisImported = If[analysisMidiResolved === motifMidiResolved, motifImported, HowlMidiImport[analysisMidiResolved]];
 If[FailureQ[analysisImported["Notes"]], Print["Failed to import analysis MIDI: ", analysisMidiResolved]; Exit[1]];
+normalizePredPitch[pred_, fallback_] := Module[{p = Lookup[pred, "NotesPred", fallback]}, If[NumericQ[p], Round[p], Round[fallback]]];
+
+motifImported = HowlMidiImport[motifMidi];
+If[FailureQ[motifImported["Notes"]], Print["Failed to import motif MIDI: ", motifMidi]; Exit[1]];
+
+analysisImported = If[analysisMidi === motifMidi, motifImported, HowlMidiImport[analysisMidi]];
+If[FailureQ[analysisImported["Notes"]], Print["Failed to import analysis MIDI: ", analysisMidi]; Exit[1]];
 
 motifRawAbs = sanitizeRawRows[encodedToStartTimes[motifImported["EncodedNotesV1"]]];
 motifAbsWindow = Select[motifRawAbs, motifStart <= #[[1]] <= motifEnd &];
@@ -255,6 +263,7 @@ globalKey = detectKeyFromPcs[analysisPcs, analysisWeights];
 
 beatSeconds = estimateBeatSeconds[motifRaw];
 beatsPerBar = estimateBeatsPerBar[analysisMidiResolved];
+beatsPerBar = estimateBeatsPerBar[analysisMidi];
 barSeconds = Max[0.4, beatSeconds*beatsPerBar];
 motifDuration = Max[motifRaw[[All, 1]] + motifRaw[[All, 2]]];
 extensionEnd = motifDuration + extensionSec;
@@ -265,6 +274,7 @@ rawTimeline = Map[bestChordForWindow[motifRaw, #, candidates] &, bars];
 timeline = Map[If[# ["Chord"] === "N.C.", Join[#, <|"PCs" -> globalKey["ScalePCs"], "Chord" -> "Scale"|>], #] &, rawTimeline];
 
 motifMelodyEncoded = canonicalizeEncoded[startTimesToEncoded[motifMelodyRaw]];
+motifMelodyEncoded = startTimesToEncoded[motifMelodyRaw];
 notes = Round[motifMelodyEncoded[[All, 4]]];
 data = N[motifMelodyEncoded[[All, 1 ;; 3]]];
 
@@ -296,6 +306,7 @@ While[currentTime < extensionEnd,
   newVol = Clip[0.85*refVol + 0.15*mixed[[3]], {0.2, 1.0}];
 
   AppendTo[notes, coercePitch[newPitch]];
+  AppendTo[notes, Round[newPitch]];
   AppendTo[data, N[{newDelay, newDur, newVol}]];
 
   currentTime = currentTime + newDelay;
@@ -306,12 +317,15 @@ melodyExtendedEncoded = Transpose@{data[[All, 1]], data[[All, 2]], data[[All, 3]
 melodyExtendedRaw = sanitizeRawRows[encodedToStartTimes[melodyExtendedEncoded]];
 combinedRaw = SortBy[Join[melodyExtendedRaw, motifHarmonyRaw], First];
 combinedEncoded = canonicalizeEncoded[startTimesToEncoded[combinedRaw]];
+combinedEncoded = startTimesToEncoded[combinedRaw];
 
 Export[outputMidi, Sound[HowlDecodeNotesV1[combinedEncoded]], "MIDI"];
 
 analysis = <|
   "MotifMidi" -> motifMidiResolved,
   "AnalysisMidi" -> analysisMidiResolved,
+  "MotifMidi" -> motifMidi,
+  "AnalysisMidi" -> analysisMidi,
   "MotifWindow" -> <|"Start" -> motifStart, "End" -> motifEnd|>,
   "DetectedKey" -> globalKey["Name"],
   "EstimatedBeatSeconds" -> beatSeconds,
