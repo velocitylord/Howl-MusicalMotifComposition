@@ -35,6 +35,7 @@ If[FailureQ[maxPitchDelta] || maxPitchDelta < 0, Print["maxPitchDelta must be no
 If[FailureQ[timingBlend] || timingBlend < 0 || timingBlend > 1, Print["timingBlend must be in [0,1]."]; Exit[1]];
 If[FailureQ[keepMotifRhythm] || keepMotifRhythm < 0 || keepMotifRhythm > 1, Print["keepMotifRhythm must be in [0,1]."]; Exit[1]];
 
+normalizePathString[s_String] := StringTrim[StringReplace[s, "\"" -> ""]];
 normalizePathString[s_String] := StringTrim[StringReplace[s, """ -> ""]];
 
 resolveMidiFile[input_String] := Module[{raw, dir, base, candidates},
@@ -48,6 +49,10 @@ resolveMidiFile[input_String] := Module[{raw, dir, base, candidates},
   If[!DirectoryQ[dir], dir = "."];
 
   candidates = DeleteDuplicates@Join[
+    FileNames[base <> ".mid", dir, Infinity],
+    FileNames[base <> ".midi", dir, Infinity],
+    Select[FileNames["*.mid", dir, Infinity], StringContainsQ[ToLowerCase[FileNameTake[#]], ToLowerCase[base]] &],
+    Select[FileNames["*.midi", dir, Infinity], StringContainsQ[ToLowerCase[FileNameTake[#]], ToLowerCase[base]] &]
     FileNames[base <> ".mid", dir, Infinity, IgnoreCase -> True],
     FileNames[base <> ".midi", dir, Infinity, IgnoreCase -> True],
     Select[FileNames["*.mid", dir, Infinity, IgnoreCase -> True], StringContainsQ[ToLowerCase[FileNameTake[#]], ToLowerCase[base]] &],
