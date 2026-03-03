@@ -164,6 +164,40 @@ Windows tip: wrap full paths with spaces in double quotes. The script will also 
 - **Balanced:** `maxPitchDelta=2`, `timingBlend=0.08`, `keepMotifRhythm=0.90`
 - **Looser variation:** `maxPitchDelta=3`, `timingBlend=0.12`, `keepMotifRhythm=0.82`
 
+
+## Notebook scripts (recommended if CLI gives parser issues)
+
+If `wolframscript -file ...` is giving syntax/version issues, use these notebook-oriented scripts instead:
+
+- `Notebooks/GenerateShortPieceNotebook.wl`
+- `Notebooks/ExtendMotifWithContextNotebook.wl`
+
+Example notebook flow:
+
+```mathematica
+SetDirectory[NotebookDirectory[]];
+<< "../Notebooks/GenerateShortPieceNotebook.wl";
+<< "../Notebooks/ExtendMotifWithContextNotebook.wl";
+
+GenerateShortPieceFromPredictor[
+  "../Scripts/checkpoints_xxxx/predictor_yyyy.wlnet",
+  "../Scripts/piece1.mid",
+  120, 17, 1337
+];
+
+ExtendMotifWithContext[
+  "../Scripts/checkpoints_xxxx/predictor_yyyy.wlnet",
+  "C:/path/to/Ashitaka and San - Hisaishi.mid",
+  1, 13, 7,
+  Automatic,
+  "../Scripts/motif_extended.mid",
+  "../Scripts/motif_extended_analysis.json",
+  1, 0.05, 0.95
+];
+```
+
+Both notebook scripts keep predictor I/O and encoded note handling aligned to the dataset/training conventions (`EncodedNotesV1`, `NumericArray[..., "Real32"]`, octave-thresholded integer pitches).
+
 ## Piece + timestamp phrase reinterpretation workflow (new)
 
 `Scripts/reinterpretPhraseWithHarmony.wls` performs a **structured phrase reinterpretation**:
