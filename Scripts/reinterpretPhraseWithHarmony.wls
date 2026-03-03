@@ -32,6 +32,9 @@ startSec = Interpreter["Number"][$ScriptCommandLine[[5]]];
 endSec = Interpreter["Number"][$ScriptCommandLine[[6]]];
 outputMidi = If[Length[$ScriptCommandLine] >= 7, $ScriptCommandLine[[7]], "Scripts/reinterpreted_phrase.mid"];
 analysisJson = If[Length[$ScriptCommandLine] >= 8, $ScriptCommandLine[[8]], "Scripts/reinterpreted_phrase_analysis.json"];
+maxPitchDelta = If[Length[$ScriptCommandLine] >= 9, Interpreter["Integer"][$ScriptCommandLine[[9]]], 2];
+keepOriginalProb = If[Length[$ScriptCommandLine] >= 10, Interpreter["Number"][$ScriptCommandLine[[10]]], 0.65];
+timingBlend = If[Length[$ScriptCommandLine] >= 11, Interpreter["Number"][$ScriptCommandLine[[11]]], 0.10];
 maxPitchDelta = If[Length[$ScriptCommandLine] >= 9, Interpreter["Integer"][$ScriptCommandLine[[9]]], 5];
 keepOriginalProb = If[Length[$ScriptCommandLine] >= 10, Interpreter["Number"][$ScriptCommandLine[[10]]], 0.20];
 timingBlend = If[Length[$ScriptCommandLine] >= 11, Interpreter["Number"][$ScriptCommandLine[[11]]], 0.30];
@@ -209,6 +212,40 @@ nearestAllowedPitch[candidatePitch_, anchorPitch_, allowedPcs_] := Module[{oct, 
   First[sorted]
 ];
 
+
+candidatePitchesForPcs[centerPitch_, allowedPcs_] := Module[{oct, choices},
+  If[Length[allowedPcs] == 0, Return[{Round[centerPitch]}]];
+  oct = Quotient[Round[centerPitch], 12];
+  choices = Flatten@Table[12 o + pc, {o, oct - 2, oct + 2}, {pc, allowedPcs}];
+  DeleteDuplicates[Sort[choices]]
+];
+
+chooseMusicalPitch[origPitch_, predPitch_, prevOrigPitch_, prevNewPitch_, allowedPcs_, maxDelta_] := Module[
+  {base, constrained, pool, targetInterval, directionPenalty, leapPenalty, scored},
+  base = Round[origPitch] + Clip[Round[predPitch] - Round[origPitch], {-maxDelta, maxDelta}];
+  constrained = nearestAllowedPitch[base, origPitch, allowedPcs];
+  pool = Select[candidatePitchesForPcs[origPitch, allowedPcs], Abs[# - origPitch] <= Max[2, maxDelta + 1] &];
+  pool = DeleteDuplicates@Join[{constrained, Round[origPitch]}, pool];
+
+  targetInterval = If[NumericQ[prevOrigPitch], Round[origPitch] - Round[prevOrigPitch], 0];
+
+  scored = SortBy[
+    pool,
+    Function[p,
+      directionPenalty = If[!NumericQ[prevNewPitch] || targetInterval == 0, 0,
+        If[Sign[p - prevNewPitch] == Sign[targetInterval], 0, 0.9]
+      ];
+      leapPenalty = If[!NumericQ[prevNewPitch], 0, 0.18*Max[0, Abs[p - prevNewPitch] - 5]];
+      {
+        0.75*Abs[p - constrained] + 0.55*Abs[p - Round[origPitch]] + directionPenalty + leapPenalty,
+        Abs[p - Round[predPitch]],
+        Abs[p - Round[origPitch]]
+      }
+    ]
+  ];
+  Clip[Round[First[scored]], {-60, 59}]
+];
+
 normalizePredPitch[predPitchRaw_, origPitch_] := If[NumericQ[predPitchRaw], Round[predPitchRaw], Round[origPitch]];
 normalizePredNoteData[predDataRaw_, origData_] := Module[{candidate = predDataRaw, asList},
   asList = Which[
@@ -259,6 +296,8 @@ candidates = buildRootedCandidates[];
 rawTimeline = Map[bestChordForWindow[windowRaw, #, candidates] &, bars];
 timeline = Map[Join[#, <|"Key" -> globalKey["Name"]|>] &, rawTimeline];
 
+Print["Reinterpretation settings: maxPitchDelta=", maxPitchDelta, ", keepOriginalProb=", keepOriginalProb, ", timingBlend=", timingBlend];
+
 melodyEncoded = startTimesToEncoded[melodyRaw];
 origNotes = melodyEncoded[[All, 4]];
 origData = N[melodyEncoded[[All, 1 ;; 3]]];
@@ -285,10 +324,20 @@ Do[
   keyPcs = If[KeyExistsQ[globalKey, "ScalePCs"], globalKey["ScalePCs"], {}];
   allowedPcs = DeleteDuplicates@Join[chordPcs, keyPcs];
 
+  prevOrigPitch = If[i > 1, origNotes[[i - 1]], Missing["None"]];
+  prevNewPitch = If[Length[rewriteNotes] > 0, Last[rewriteNotes], Missing["None"]];
+
   keepOrig = RandomReal[] < keepOriginalProb;
   If[keepOrig,
     newPitch = thisOrigPitch;
     newData = thisOrigData;,
+    newPitch = chooseMusicalPitch[thisOrigPitch, predPitch, prevOrigPitch, prevNewPitch, allowedPcs, maxPitchDelta];
+
+    (* Keep rhythmic identity strong for musicality; only light blend on velocity/duration. *)
+    mixed = (1 - timingBlend) thisOrigData + timingBlend predData;
+    newDelay = Max[0.001, thisOrigData[[1]]];
+    newDur = Max[0.05, 0.8*thisOrigData[[2]] + 0.2*mixed[[2]]];
+    newVol = Clip[0.75*thisOrigData[[3]] + 0.25*mixed[[3]], {0.2, 1.0}];
     pitchDelta = Clip[predPitch - Round[thisOrigPitch], {-maxPitchDelta, maxPitchDelta}];
     candidatePitch = Round[thisOrigPitch] + pitchDelta;
     newPitch = nearestAllowedPitch[candidatePitch, thisOrigPitch, allowedPcs];
@@ -327,6 +376,8 @@ analysis = <|
   "OriginalMelodyNoteCount" -> Length[melodyRaw],
   "OriginalHarmonyNoteCount" -> Length[harmonyRaw],
   "ReinterpretedMelodyNoteCount" -> Length[reworkedMelodyRaw],
+  "OutputTotalNoteCount" -> Length[combinedRaw],
+  "Settings" -> <|"MaxPitchDelta" -> maxPitchDelta, "KeepOriginalProb" -> keepOriginalProb, "TimingBlend" -> timingBlend|>
   "OutputTotalNoteCount" -> Length[combinedRaw]
 |>;
 

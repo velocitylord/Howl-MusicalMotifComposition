@@ -109,6 +109,7 @@ This keeps generation close to the original training/predictor pipeline and is u
 - keeps original harmony notes, and exports MIDI + analysis JSON.
 
 ```bash
+wolframscript -file Scripts/reinterpretPhraseWithHarmony.wls   Scripts/checkpoints_xxxx/predictor_yyyy.wlnet   Scripts/dataset.wxf   "Ashitaka"   4 25   Scripts/ashitaka_reinterpreted.mid   Scripts/ashitaka_reinterpreted_analysis.json   2   0.65   0.10
 wolframscript -file Scripts/reinterpretPhraseWithHarmony.wls   Scripts/checkpoints_xxxx/predictor_yyyy.wlnet   Scripts/dataset.wxf   "Ashitaka"   4 25   Scripts/ashitaka_reinterpreted.mid   Scripts/ashitaka_reinterpreted_analysis.json   5   0.20   0.30
 ```
 
@@ -120,6 +121,22 @@ Arguments:
 4. `startSec endSec`: timestamp window to reinterpret
 5. `outputMidi` (optional): output MIDI path (default `Scripts/reinterpreted_phrase.mid`)
 6. `analysisJson` (optional): key/chord + output summary JSON path
+7. `maxPitchDelta` (optional): max semitone shift from each original melody pitch (default `2`)
+8. `keepOriginalProb` (optional): probability each melody note stays original (default `0.65`)
+9. `timingBlend` (optional): blend factor between original and predicted delay/duration/volume (default `0.10`)
+
+
+### Quick presets for "presentable tomorrow"
+
+- **Safest / most musical:** `maxPitchDelta=1`, `keepOriginalProb=0.80`, `timingBlend=0.05`
+- **Balanced:** `maxPitchDelta=2`, `keepOriginalProb=0.65`, `timingBlend=0.10`
+- **More adventurous:** `maxPitchDelta=3`, `keepOriginalProb=0.50`, `timingBlend=0.15`
+
+In practice, start with the **safest** setting and only increase variation if it still sounds too close to the source.
+
+### Can the predictor choose chord progressions?
+
+Not directly in this project. The predictor is used here as a **next-note/melodic suggestion** model; it was not trained as a dedicated chord-progression planner. This workflow therefore keeps harmony grounded by detecting key/chords from the selected phrase and constraining melody edits to that context.
 7. `maxPitchDelta` (optional): max semitone shift from each original melody pitch (default `5`)
 8. `keepOriginalProb` (optional): probability each melody note stays original (default `0.20`)
 9. `timingBlend` (optional): blend factor between original and predicted delay/duration/volume (default `0.30`)
