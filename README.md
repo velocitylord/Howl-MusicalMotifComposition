@@ -97,28 +97,19 @@ Export["Scripts/generated.mid", Sound[HowlDecodeNotesV1[encoded]], "MIDI"];
 
 This keeps generation close to the original training/predictor pipeline and is usually easiest to debug before adding CLI wrappers.
 
-## Piece + timestamp constrained rework workflow (new)
+## Piece + timestamp phrase reinterpretation workflow (new)
 
-`Scripts/improviseFromPiece.wls` now performs a **constrained rework** (not melody/harmony continuation):
+`Scripts/reinterpretPhraseWithHarmony.wls` performs a **structured phrase reinterpretation**:
 
 - selects a piece from `dataset.wxf` by filename substring,
 - extracts your target timestamp window,
-- rewrites that window event-by-event using predictor suggestions,
-- applies deviation caps to preserve structure/feel,
-- projects pitches onto detected bar-level chord context,
-- exports both MIDI and a per-bar key/chord analysis JSON.
+- detects global key + bar-level chord progression,
+- reinterprets melody notes with predictor suggestions,
+- constrains each new melody note to stay harmonically valid (active chord + key),
+- keeps original harmony notes, and exports MIDI + analysis JSON.
 
 ```bash
-wolframscript -file Scripts/improviseFromPiece.wls \
-  Scripts/checkpoints_xxxx/predictor_yyyy.wlnet \
-  Scripts/dataset.wxf \
-  "Ashitaka" \
-  4 25 \
-  Scripts/ashitaka_rework.mid \
-  2 \
-  0.12 \
-  0.35 \
-  Scripts/ashitaka_rework_analysis.json
+wolframscript -file Scripts/reinterpretPhraseWithHarmony.wls   Scripts/checkpoints_xxxx/predictor_yyyy.wlnet   Scripts/dataset.wxf   "Ashitaka"   4 25   Scripts/ashitaka_reinterpreted.mid   Scripts/ashitaka_reinterpreted_analysis.json   2   0.65   0.10
 ```
 
 Arguments:
@@ -126,49 +117,32 @@ Arguments:
 1. `predictorFile`: exported `predictor_*.wlnet` from training
 2. `datasetFile`: your dataset `.wxf` produced by `Scripts/makeDataset.wls`
 3. `pieceQuery`: case-insensitive substring match against file names in the dataset
-4. `startSec endSec`: timestamp window to rework
-5. `outputMidi` (optional): output MIDI path (default `Scripts/rework.mid`)
-6. `maxPitchDelta` (optional): max semitone shift from each original pitch (default `2`)
-7. `maxTimingFrac` (optional): max timing/duration relative deviation cap (default `0.12`)
-8. `keepOriginalProb` (optional): probability each note stays exactly original (default `0.35`)
-9. `analysisJson` (optional): per-bar analysis output JSON path
+4. `startSec endSec`: timestamp window to reinterpret
+5. `outputMidi` (optional): output MIDI path (default `Scripts/reinterpreted_phrase.mid`)
+6. `analysisJson` (optional): key/chord + output summary JSON path
+7. `maxPitchDelta` (optional): max semitone shift from each original melody pitch (default `2`)
+8. `keepOriginalProb` (optional): probability each melody note stays original (default `0.65`)
+9. `timingBlend` (optional): blend factor between original and predicted delay/duration/volume (default `0.10`)
 
-### Chord-template library (root-relative pitch-class sets)
 
-The script includes categorized chord templates for harmonic projection:
+### Quick presets for "presentable tomorrow"
 
-- **Triads:** major, minor, diminished, augmented, sus2, sus4
-- **Sixths:** 6, m6, 6/9, m6/9
-- **Sevenths:** dominant 7, major 7, minor 7, minor-major 7, half-diminished 7, diminished 7, 7sus4, augmented 7, augmented-major 7
-- **Ninths:** add9, minor add9, dominant 9, major 9, minor 9, 9sus4
+- **Safest / most musical:** `maxPitchDelta=1`, `keepOriginalProb=0.80`, `timingBlend=0.05`
+- **Balanced:** `maxPitchDelta=2`, `keepOriginalProb=0.65`, `timingBlend=0.10`
+- **More adventurous:** `maxPitchDelta=3`, `keepOriginalProb=0.50`, `timingBlend=0.15`
 
-These templates are expanded over all 12 roots, but rework projection now prefers a stabilized subset (`Triads`, `Sevenths`) to reduce noisy harmony flips.
+In practice, start with the **safest** setting and only increase variation if it still sounds too close to the source.
 
-### Bar-level key/chord timeline
+### Can the predictor choose chord progressions?
 
-The script estimates bar windows and emits chord/key per bar in `analysisJson`:
-
-- It estimates beat length from note onsets in the selected window.
-- It tries to read MIDI time signature metadata and uses the numerator when available.
-- If metadata is unavailable, it falls back to **4/4-like** behavior.
-- It detects one global key profile over the selected window and applies continuity-biased chord scoring bar-to-bar.
-
-This gives practical bar-by-bar harmonic context for constrained pitch projection with better stability.
+Not directly in this project. The predictor is used here as a **next-note/melodic suggestion** model; it was not trained as a dedicated chord-progression planner. This workflow therefore keeps harmony grounded by detecting key/chords from the selected phrase and constraining melody edits to that context.
 
 ### Troubleshooting
 
-- If you see errors mentioning `ToExpression::sntx`, `NumericArray::lend`, `Part::partw`, `Export::jsonstrictencoding`, or `NetGraph::incseqlen`, pull the latest branch version of `Scripts/improviseFromPiece.wls`.
-  - Recent fixes normalize predictor outputs (`NotesPred` / `NoteDataPred`) before blending and sanitize non-scalar imported note rows so rework data stays valid numeric lists.
-- If you see `Multiple matches found. Using first: ...`, your `pieceQuery` matched more than one file. Use a more specific query string.
-- If you see `ToExpression::sntx` near helper initialization, update to the latest script version; helper list assignments were rewritten in a parser-safer form for Wolfram CLI compatibility.
-- If you see `ToExpression::sntx`, make sure your local branch is fully up to date and retry with a clean copy of `Scripts/improviseFromPiece.wls`.
-- If you see `ToExpression::sntx` near the chord helper initialization, make sure your branch has the latest script update (the helper symbol reset was rewritten to avoid parser-fragile long `ClearAll[...]` lists).
-- If you see errors mentioning `NumericArray::lend`, `Part::partw`, `Export::jsonstrictencoding`, or `NetGraph::incseqlen`, pull the latest branch version of `Scripts/improviseFromPiece.wls`.
-  - Recent fixes normalize predictor outputs (`NotesPred` / `NoteDataPred`) before blending and sanitize non-scalar imported note rows so rework data stays valid numeric lists.
-- If you see errors mentioning `NumericArray::lend`, `Part::partw`, or `NetGraph::incseqlen`, pull the latest branch version of `Scripts/improviseFromPiece.wls`.
-  - Recent fixes normalize predictor outputs (`NotesPred` / `NoteDataPred`) before blending so rework data stays valid numeric lists.
-- If you see `Multiple matches found. Using first: ...`, your `pieceQuery` matched more than one file. Use a more specific query string.
-- If the output MIDI is unexpectedly short, inspect the generated `analysisJson` and confirm the selected timestamp window includes enough notes and that predictor loading succeeded.
+- If the piece query matches multiple entries, the first match is used. Prefer a more specific query.
+- If output sounds too conservative, decrease `keepOriginalProb` and/or increase `maxPitchDelta`.
+- If rhythm drifts too much, lower `timingBlend`.
+- If your range has too few notes, widen the `startSec/endSec` window.
 
 Also, check out [this helpful guide][1] for information about modeling sequential data with neural nets - if you want to dive in deep and make your own generator.
 

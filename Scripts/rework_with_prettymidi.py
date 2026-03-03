@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run Wolfram rework generation and produce PrettyMIDI analyses.
 
-This script wraps Scripts/improviseFromPiece.wls (for predictor-based rework)
+This script wraps Scripts/reinterpretPhraseWithHarmony.wls (for predictor-based phrase reinterpretation)
 and uses pretty_midi to export comparable analysis JSON for:
 1) the selected source piece
 2) the reinterpreted output piece
@@ -81,24 +81,23 @@ def run_rework(args: argparse.Namespace) -> tuple[Path | None, str]:
     cmd = [
         "wolframscript",
         "-file",
-        "Scripts/improviseFromPiece.wls",
+        "Scripts/reinterpretPhraseWithHarmony.wls",
         args.predictor,
         args.dataset,
         args.piece_query,
         str(args.start_sec),
         str(args.end_sec),
         args.output_midi,
-        str(args.max_pitch_delta),
-        str(args.max_timing_frac),
-        str(args.keep_original_prob),
         args.wolfram_analysis_json,
-        str(args.swing_frac),
+        str(args.max_pitch_delta),
+        str(args.keep_original_prob),
+        str(args.timing_blend),
     ]
 
     proc = subprocess.run(cmd, text=True, capture_output=True)
     combined = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
     if proc.returncode != 0:
-        raise RuntimeError(f"improviseFromPiece failed (exit {proc.returncode})\n{combined}")
+        raise RuntimeError(f"reinterpretPhraseWithHarmony failed (exit {proc.returncode})\n{combined}")
 
     selected_piece = None
     m = re.search(r"Selected piece:\s*(.+)", combined)
@@ -115,13 +114,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--piece-query", required=True)
     p.add_argument("--start-sec", type=float, required=True)
     p.add_argument("--end-sec", type=float, required=True)
-    p.add_argument("--output-midi", default="Scripts/rework.mid")
+    p.add_argument("--output-midi", default="Scripts/reinterpreted_phrase.mid")
     p.add_argument("--max-pitch-delta", type=int, default=2)
-    p.add_argument("--max-timing-frac", type=float, default=0.12)
-    p.add_argument("--keep-original-prob", type=float, default=0.35)
-    p.add_argument("--wolfram-analysis-json", default="Scripts/rework_analysis.json")
-    p.add_argument("--combined-analysis-json", default="Scripts/rework_pretty_analysis.json")
-    p.add_argument("--swing-frac", type=float, default=0.0)
+    p.add_argument("--keep-original-prob", type=float, default=0.65)
+    p.add_argument("--wolfram-analysis-json", default="Scripts/reinterpreted_phrase_analysis.json")
+    p.add_argument("--combined-analysis-json", default="Scripts/reinterpreted_phrase_pretty_analysis.json")
+    p.add_argument("--timing-blend", type=float, default=0.10)
     return p
 
 
@@ -146,7 +144,7 @@ def main() -> int:
             "start_sec": args.start_sec,
             "end_sec": args.end_sec,
             "output_midi": args.output_midi,
-            "swing_frac": args.swing_frac,
+            "timing_blend": args.timing_blend,
         },
         "wolfram_log": wolfram_log,
         "source_piece_analysis": source_analysis,
