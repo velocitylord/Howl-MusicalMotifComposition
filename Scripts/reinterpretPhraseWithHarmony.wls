@@ -15,9 +15,6 @@
 repoRoot = DirectoryName[DirectoryName[ExpandFileName[First[$ScriptCommandLine]]]];
 SetDirectory[repoRoot];
 
-Quiet[Off[ToExpression::sntx]];
-Quiet[Off[ToExpression::sntxi]];
-
 If[Length[$ScriptCommandLine] < 6,
   Print[
     "Usage: wolframscript -file Scripts/reinterpretPhraseWithHarmony.wls <predictorFile> <datasetFile> <pieceQuery> <startSec> <endSec> [outputMidi] [analysisJson] [maxPitchDelta] [keepOriginalProb] [timingBlend]"
@@ -35,22 +32,16 @@ analysisJson = If[Length[$ScriptCommandLine] >= 8, $ScriptCommandLine[[8]], "Scr
 maxPitchDelta = If[Length[$ScriptCommandLine] >= 9, Interpreter["Integer"][$ScriptCommandLine[[9]]], 2];
 keepOriginalProb = If[Length[$ScriptCommandLine] >= 10, Interpreter["Number"][$ScriptCommandLine[[10]]], 0.65];
 timingBlend = If[Length[$ScriptCommandLine] >= 11, Interpreter["Number"][$ScriptCommandLine[[11]]], 0.10];
-maxPitchDelta = If[Length[$ScriptCommandLine] >= 9, Interpreter["Integer"][$ScriptCommandLine[[9]]], 5];
-keepOriginalProb = If[Length[$ScriptCommandLine] >= 10, Interpreter["Number"][$ScriptCommandLine[[10]]], 0.20];
-timingBlend = If[Length[$ScriptCommandLine] >= 11, Interpreter["Number"][$ScriptCommandLine[[11]]], 0.30];
 
 If[FailureQ[startSec] || FailureQ[endSec] || endSec <= startSec,
   Print["Invalid timestamp range. Example: 6 24"]; Exit[1];
 ];
-
 If[FailureQ[maxPitchDelta] || maxPitchDelta < 0,
   Print["maxPitchDelta must be a non-negative integer."]; Exit[1];
 ];
-
 If[FailureQ[keepOriginalProb] || keepOriginalProb < 0 || keepOriginalProb > 1,
   Print["keepOriginalProb must be in [0,1]."]; Exit[1];
 ];
-
 If[FailureQ[timingBlend] || timingBlend < 0 || timingBlend > 1,
   Print["timingBlend must be in [0,1]."]; Exit[1];
 ];
@@ -59,7 +50,6 @@ Get["Howl/HowlMidiTools.wl"];
 
 dataset = Import[datasetPath];
 If[FailureQ[dataset], Print["Failed to import dataset: ", datasetPath]; Exit[1]];
-
 predictor = Import[predictorPath];
 If[FailureQ[predictor], Print["Failed to import predictor: ", predictorPath]; Exit[1]];
 
@@ -99,12 +89,10 @@ splitMelodyHarmonyByOnset[rawRows_, tol_:0.03] := Module[{sorted, groups = {}, c
   {SortBy[melody, First], SortBy[harmony, First]}
 ];
 
-(* Key/chord helpers *)
 noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 -> "F#", 7 -> "G", 8 -> "Ab", 9 -> "A", 10 -> "Bb", 11 -> "B"|>;
 majorScaleSteps = {0, 2, 4, 5, 7, 9, 11};
 minorScaleSteps = {0, 2, 3, 5, 7, 8, 10};
 noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
-
 buildScalePCs[tonicPc_, scaleType_] := Mod[tonicPc + If[scaleType == "minor", minorScaleSteps, majorScaleSteps], 12];
 
 scoreKeyFit[pcs_, w_, tonicPc_, scaleType_] := Module[{scalePcs, inScaleW, tonicW},
@@ -134,9 +122,8 @@ chordTemplates = {
   <|"Quality" -> "maj7", "PCs" -> {0, 4, 7, 11}|>,
   <|"Quality" -> "min7", "PCs" -> {0, 3, 7, 10}|>
 };
-
 buildRootedCandidates[] := Flatten@Table[
-  <|"RootPC" -> root, "PCs" -> Mod[root + tpl["PCs"], 12], "Label" -> (noteNameForPc[root] <> tpl["Quality"])|>,
+  <|"RootPC" -> root, "PCs" -> Mod[root + tpl["PCs"], 12], "Label" -> (noteNameForPc[root] <> tpl["Quality"] )|>,
   {tpl, chordTemplates}, {root, 0, 11}
 ];
 
@@ -194,7 +181,7 @@ bestChordForWindow[rawNotes_, win_, candidates_] := Module[{notesIn, weighted, s
     Return[<|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> "N.C.", "PCs" -> {}, "RootPC" -> Missing["None"], "Score" -> -Infinity|>]
   ];
   scored = Map[Append[#, "Score" -> scoreChordCandidate[weighted, #]] &, candidates];
-  best = First@MaximalBy[scored, #["Score"] &];
+  best = First@MaximalBy[scored, # ["Score"] &];
   <|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> best["Label"], "PCs" -> best["PCs"], "RootPC" -> best["RootPC"], "Score" -> best["Score"]|>
 ];
 
@@ -211,7 +198,6 @@ nearestAllowedPitch[candidatePitch_, anchorPitch_, allowedPcs_] := Module[{oct, 
   sorted = SortBy[choices, {Abs[# - candidatePitch] &, Abs[# - anchorPitch] &} &];
   First[sorted]
 ];
-
 
 candidatePitchesForPcs[centerPitch_, allowedPcs_] := Module[{oct, choices},
   If[Length[allowedPcs] == 0, Return[{Round[centerPitch]}]];
@@ -258,12 +244,12 @@ normalizePredNoteData[predDataRaw_, origData_] := Module[{candidate = predDataRa
 
 validDataset = Select[
   dataset,
-  AssociationQ[#] && KeyExistsQ[#, "File"] && KeyExistsQ[#, "EncodedNotesV1"] && !FailureQ[#["EncodedNotesV1"]] &
+  AssociationQ[#] && KeyExistsQ[#, "File"] && KeyExistsQ[#, "EncodedNotesV1"] && !FailureQ[# ["EncodedNotesV1"]] &
 ];
 
 matches = Select[
   validDataset,
-  StringContainsQ[ToLowerCase[FileNameTake[#["File"]]], ToLowerCase[pieceQuery]] &
+  StringContainsQ[ToLowerCase[FileNameTake[# ["File"]]], ToLowerCase[pieceQuery]] &
 ];
 
 If[Length[matches] == 0, Print["No piece matched query: ", pieceQuery]; Exit[1]];
@@ -332,21 +318,10 @@ Do[
     newPitch = thisOrigPitch;
     newData = thisOrigData;,
     newPitch = chooseMusicalPitch[thisOrigPitch, predPitch, prevOrigPitch, prevNewPitch, allowedPcs, maxPitchDelta];
-
-    (* Keep rhythmic identity strong for musicality; only light blend on velocity/duration. *)
     mixed = (1 - timingBlend) thisOrigData + timingBlend predData;
     newDelay = Max[0.001, thisOrigData[[1]]];
     newDur = Max[0.05, 0.8*thisOrigData[[2]] + 0.2*mixed[[2]]];
     newVol = Clip[0.75*thisOrigData[[3]] + 0.25*mixed[[3]], {0.2, 1.0}];
-    pitchDelta = Clip[predPitch - Round[thisOrigPitch], {-maxPitchDelta, maxPitchDelta}];
-    candidatePitch = Round[thisOrigPitch] + pitchDelta;
-    newPitch = nearestAllowedPitch[candidatePitch, thisOrigPitch, allowedPcs];
-    newPitch = Clip[newPitch, {-60, 59}];
-
-    mixed = (1 - timingBlend) thisOrigData + timingBlend predData;
-    newDelay = Max[0.001, mixed[[1]]];
-    newDur = Max[0.05, mixed[[2]]];
-    newVol = Clip[mixed[[3]], {0.2, 1.0}];
     newData = N[{newDelay, newDur, newVol}];
   ];
 
@@ -358,7 +333,6 @@ Do[
 
 reworkedMelodyEncoded = Transpose@{rewriteData[[All, 1]], rewriteData[[All, 2]], rewriteData[[All, 3]], rewriteNotes};
 reworkedMelodyRaw = sanitizeRawRows[encodedToStartTimes[reworkedMelodyEncoded]];
-
 combinedRaw = SortBy[Join[reworkedMelodyRaw, harmonyRaw], First];
 combinedEncoded = startTimesToEncoded[combinedRaw];
 outNotes = HowlDecodeNotesV1[combinedEncoded];
@@ -378,7 +352,6 @@ analysis = <|
   "ReinterpretedMelodyNoteCount" -> Length[reworkedMelodyRaw],
   "OutputTotalNoteCount" -> Length[combinedRaw],
   "Settings" -> <|"MaxPitchDelta" -> maxPitchDelta, "KeepOriginalProb" -> keepOriginalProb, "TimingBlend" -> timingBlend|>
-  "OutputTotalNoteCount" -> Length[combinedRaw]
 |>;
 
 safeAnalysis = analysis /. {Missing[__] -> "None", DirectedInfinity[_] -> Null, Infinity -> Null, -Infinity -> Null};
