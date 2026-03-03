@@ -2,13 +2,14 @@
 
 (* Usage:
    wolframscript -file Scripts/improviseFromPiece.wls \
-     <predictorFile> <datasetFile> <pieceQuery> <startSec> <endSec> [outputMidi] [maxPitchDelta] [maxTimingFrac] [keepOriginalProb] [analysisJson]
+     <predictorFile> <datasetFile> <pieceQuery> <startSec> <endSec> [outputMidi] [maxPitchDelta] [maxTimingFrac] [keepOriginalProb] [analysisJson] [swingFrac]
 
    outputMidi (optional): output path, default "Scripts/rework.mid"
    maxPitchDelta (optional): max semitone deviation per note, default 2
    maxTimingFrac (optional): max relative timing/duration deviation, default 0.12
    keepOriginalProb (optional): probability to keep each original note unchanged, default 0.35
    analysisJson (optional): save bar-by-bar key/chord analysis, default "Scripts/rework_analysis.json"
+   swingFrac (optional): amount of off-beat swing in [0,0.35], default 0.0
 *)
 
 repoRoot = DirectoryName[DirectoryName[ExpandFileName[First[$ScriptCommandLine]]]];
@@ -16,7 +17,7 @@ SetDirectory[repoRoot];
 
 If[Length[$ScriptCommandLine] < 6,
   Print[
-    "Usage: wolframscript -file Scripts/improviseFromPiece.wls <predictorFile> <datasetFile> <pieceQuery> <startSec> <endSec> [outputMidi] [maxPitchDelta] [maxTimingFrac] [keepOriginalProb] [analysisJson]"
+    "Usage: wolframscript -file Scripts/improviseFromPiece.wls <predictorFile> <datasetFile> <pieceQuery> <startSec> <endSec> [outputMidi] [maxPitchDelta] [maxTimingFrac] [keepOriginalProb] [analysisJson] [swingFrac]"
   ];
   Exit[1];
 ];
@@ -31,6 +32,7 @@ maxPitchDelta = If[Length[$ScriptCommandLine] >= 8, Interpreter["Integer"][$Scri
 maxTimingFrac = If[Length[$ScriptCommandLine] >= 9, Interpreter["Number"][$ScriptCommandLine[[9]]], 0.12];
 keepOriginalProb = If[Length[$ScriptCommandLine] >= 10, Interpreter["Number"][$ScriptCommandLine[[10]]], 0.35];
 analysisJson = If[Length[$ScriptCommandLine] >= 11, $ScriptCommandLine[[11]], "Scripts/rework_analysis.json"];
+swingFrac = If[Length[$ScriptCommandLine] >= 12, Interpreter["Number"][$ScriptCommandLine[[12]]], 0.0];
 
 If[FailureQ[startSec] || FailureQ[endSec] || endSec <= startSec,
   Print["Invalid timestamp range. Example: 4 25"]; Exit[1];
@@ -46,6 +48,10 @@ If[FailureQ[maxTimingFrac] || maxTimingFrac < 0 || maxTimingFrac > 0.8,
 
 If[FailureQ[keepOriginalProb] || keepOriginalProb < 0 || keepOriginalProb > 1,
   Print["keepOriginalProb must be in [0, 1]."]; Exit[1];
+];
+
+If[FailureQ[swingFrac] || swingFrac < 0 || swingFrac > 0.35,
+  Print["swingFrac must be in [0, 0.35]."]; Exit[1];
 ];
 
 Get["Howl/HowlMidiTools.wl"];
@@ -64,12 +70,12 @@ If[FailureQ[predictor],
 
 validDataset = Select[
   dataset,
-  AssociationQ[#] && KeyExistsQ[#, "File"] && KeyExistsQ[#, "EncodedNotesV1"] && !FailureQ[# ["EncodedNotesV1"]] &
+  AssociationQ[#] && KeyExistsQ[#, "File"] && KeyExistsQ[#, "EncodedNotesV1"] && !FailureQ[#["EncodedNotesV1"]] &
 ];
 
 matches = Select[
   validDataset,
-  StringContainsQ[ToLowerCase[FileNameTake[# ["File"]]], ToLowerCase[pieceQuery]] &
+  StringContainsQ[ToLowerCase[FileNameTake[#["File"]]], ToLowerCase[pieceQuery]] &
 ];
 
 If[Length[matches] == 0,
@@ -98,26 +104,9 @@ startTimesToEncoded[raw_] := Module[{sorted, starts, durations, volumes, pitches
 (* ---------- Chord/key helpers ---------- *)
 noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 -> "F#", 7 -> "G", 8 -> "Ab", 9 -> "A", 10 -> "Bb", 11 -> "B"|>;
 noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
-majorScaleSteps = List[0, 2, 4, 5, 7, 9, 11];
-minorScaleSteps = List[0, 2, 3, 5, 7, 8, 10];
-chordHelperSymbols = {
-  noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
-ClearAll[noteNames, noteNameForPc, majorScaleSteps, minorScaleSteps, buildScalePCs,
-  scoreKeyFit, detectKeyFromPcs, chordTemplateCategories, flattenChordTemplates,
-  chordNameFor, buildRootedCandidates, overlapWeight, barWindows, estimateBeatsPerBar,
-  estimateBeatSeconds, scoreChordCandidate, bestChordForWindow, chordTimelineForWindow,
-  chooseStableChordForWindow, buildStableChordTimeline, preferredChordCategories,
-  categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch,
-  keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch
-};
-Scan[ClearAll, chordHelperSymbols];
-  categoryBias, globalKeyProfileFromWindow, sanitizeRawRows, nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
-  categoryBias, globalKeyProfileFromWindow, nearestAllowedPitch, keyByBar, activeChordAtTime, normalizePredNoteData, normalizePredPitch];
-
-noteNames = <|0 -> "C", 1 -> "C#", 2 -> "D", 3 -> "Eb", 4 -> "E", 5 -> "F", 6 -> "F#", 7 -> "G", 8 -> "Ab", 9 -> "A", 10 -> "Bb", 11 -> "B"|>;
-noteNameForPc[pc_] := Lookup[noteNames, Mod[pc, 12], "C"];
 majorScaleSteps = {0, 2, 4, 5, 7, 9, 11};
 minorScaleSteps = {0, 2, 3, 5, 7, 8, 10};
+
 buildScalePCs[tonicPc_, scaleType_] := Mod[tonicPc + If[scaleType == "minor", minorScaleSteps, majorScaleSteps], 12];
 
 scoreKeyFit[pcs_, w_, tonicPc_, scaleType_] := Module[{scalePcs, inScaleW, tonicW},
@@ -132,7 +121,7 @@ detectKeyFromPcs[pcs_, weights_] := Module[{candidates, best},
     <|"TonicPC" -> tonic, "ScaleType" -> scale, "Score" -> scoreKeyFit[pcs, weights, tonic, scale]|>,
     {scale, {"major", "minor"}}, {tonic, 0, 11}
   ];
-  best = First@MaximalBy[candidates, # ["Score"] &];
+  best = First@MaximalBy[candidates, #["Score"] &];
   Join[best, <|"Name" -> (noteNameForPc[best["TonicPC"]] <> " " <> best["ScaleType"]), "ScalePCs" -> buildScalePCs[best["TonicPC"], best["ScaleType"]]|>]
 ];
 
@@ -159,7 +148,6 @@ flattenChordTemplates[] := Flatten[KeyValueMap[Function[{cat, assoc}, KeyValueMa
 
 chordNameFor[rootPc_, quality_] := noteNameForPc[rootPc] <> quality;
 
-preferredChordCategories = List["Triads", "Sevenths"];
 preferredChordCategories = {"Triads", "Sevenths"};
 categoryBias = <|"Triads" -> 0.35, "Sevenths" -> 0.22, "Sixths" -> -0.12, "Ninths" -> -0.22|>;
 
@@ -211,14 +199,14 @@ estimateBeatsPerBar[file_] := Module[{sigCandidates, firstSig},
 barWindows[startT_, endT_, barSeconds_] := Module[{bars, barStarts},
   barStarts = Range[Floor[startT/barSeconds]*barSeconds, endT, barSeconds];
   bars = Map[<|"Start" -> #, "End" -> Min[# + barSeconds, endT]|> &, barStarts];
-  Select[bars, # ["End"] > startT &]
+  Select[bars, #["End"] > startT &]
 ];
 
 scoreChordCandidate[notesInWindow_, candidate_] := Module[{weights, pcs, bassPc, chordPcs, inChord, outChord, bassBonus},
   If[Length[notesInWindow] == 0, Return[-Infinity]];
   weights = notesInWindow[[All, 5]];
   pcs = Mod[notesInWindow[[All, 4]], 12];
-  bassPc = Mod[First@SortBy[notesInWindow, #[[4]] &][[4]], 12];
+  bassPc = Mod[(First@SortBy[notesInWindow, #[[4]] &])[[4]], 12];
   chordPcs = candidate["PCs"];
   inChord = Total@Pick[weights, MemberQ[chordPcs, #] & /@ pcs, True];
   outChord = Total@Pick[weights, MemberQ[chordPcs, #] & /@ pcs, False];
@@ -233,7 +221,7 @@ bestChordForWindow[rawNotes_, win_, rootedCandidates_] := Module[{notesInWindow,
     Return[<|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> "N.C.", "Category" -> "None", "PCs" -> {}, "RootPC" -> Missing["None"], "Score" -> -Infinity|>]
   ];
   scored = Map[Append[#, "Score" -> scoreChordCandidate[weighted, #]] &, rootedCandidates];
-  best = First@MaximalBy[scored, # ["Score"] &];
+  best = First@MaximalBy[scored, #["Score"] &];
   <|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> best["Label"], "Category" -> best["Category"], "PCs" -> best["PCs"], "RootPC" -> best["RootPC"], "Score" -> best["Score"]|>
 ];
 
@@ -287,7 +275,7 @@ chooseStableChordForWindow[rawNotes_, win_, rootedCandidates_, keyProfile_, prev
     scored
   ];
 
-  best = First@MaximalBy[scoredAdjusted, # ["AdjustedScore"] &];
+  best = First@MaximalBy[scoredAdjusted, #["AdjustedScore"] &];
   <|"Start" -> win["Start"], "End" -> win["End"], "Chord" -> best["Label"], "Category" -> best["Category"], "PCs" -> best["PCs"], "RootPC" -> best["RootPC"], "Score" -> best["AdjustedScore"]|>
 ];
 
@@ -301,7 +289,7 @@ buildStableChordTimeline[rawNotes_, bars_, rootedCandidates_, keyProfile_] := Mo
 ];
 
 activeChordAtTime[t_, timeline_] := Module[{match},
-  match = SelectFirst[timeline, # ["Start"] <= t < # ["End"] &];
+  match = SelectFirst[timeline, #["Start"] <= t < #["End"] &];
   If[match === Missing["NotFound"], Last[timeline], match]
 ];
 
@@ -311,6 +299,46 @@ nearestAllowedPitch[candidatePitch_, originalPitch_, allowedPcs_] := Module[{oct
   pitchCandidates = Flatten@Table[12 o + pc, {o, oct - 2, oct + 2}, {pc, allowedPcs}];
   sorted = SortBy[pitchCandidates, {Abs[# - candidatePitch] &, Abs[# - originalPitch] &} &];
   First[sorted]
+];
+
+
+splitMelodyHarmonyByOnset[rawRows_, tol_:0.03] := Module[{sorted, groups = {}, current = {}, melody = {}, harmony = {}, top},
+  sorted = SortBy[rawRows, First];
+  If[Length[sorted] == 0, Return[{ {}, {} }]];
+  current = {First[sorted]};
+  Do[
+    If[Abs[row[[1]] - current[[-1, 1]]] <= tol,
+      AppendTo[current, row],
+      AppendTo[groups, current];
+      current = {row}
+    ]
+  , {row, Rest[sorted]}];
+  AppendTo[groups, current];
+
+  Do[
+    top = Last@SortBy[g, #[[4]] &];
+    AppendTo[melody, top];
+    harmony = Join[harmony, DeleteCases[g, top]];
+  , {g, groups}];
+
+  {SortBy[melody, First], SortBy[harmony, First]}
+];
+
+
+applySwingToRaw[rawRows_, beatSec_, swingAmount_] := Module[{shift, swung},
+  If[swingAmount <= 0 || beatSec <= 0 || Length[rawRows] == 0, Return[rawRows]];
+  shift = swingAmount*0.25*beatSec;
+  swung = Map[
+    Function[r,
+      Module[{st = r[[1]], phase, newStart},
+        phase = Mod[st, beatSec]/beatSec;
+        newStart = If[phase >= 0.45 && phase <= 0.95, st + shift, st];
+        {Max[0, newStart], r[[2]], r[[3]], r[[4]]}
+      ]
+    ],
+    rawRows
+  ];
+  SortBy[swung, First]
 ];
 
 normalizePredNoteData[predDataRaw_, origData_] := Module[{candidate = predDataRaw, asList},
@@ -330,7 +358,6 @@ normalizePredPitch[predPitchRaw_, origPitch_] := Module[{candidate = predPitchRa
 (* ---------- Select and normalize target window ---------- *)
 encodedPiece = selected["EncodedNotesV1"];
 pieceRaw = sanitizeRawRows[encodedToStartTimes[encodedPiece]];
-pieceRaw = encodedToStartTimes[encodedPiece];
 
 windowRawAbsolute = Select[pieceRaw, startSec <= #[[1]] <= endSec &];
 If[Length[windowRawAbsolute] < 8,
@@ -345,16 +372,20 @@ If[Length[sanitizeRawRows[windowRawAbsolute]] < 8,
 
 windowOffset = Min[windowRawAbsolute[[All, 1]]];
 windowRaw = SortBy[sanitizeRawRows[windowRawAbsolute], First];
-windowOffset = Min[windowRawAbsolute[[All, 1]]];
-windowRaw = windowRawAbsolute;
 windowRaw[[All, 1]] = windowRaw[[All, 1]] - windowOffset;
 windowDuration = Max[windowRaw[[All, 1]] + windowRaw[[All, 2]]];
 
-windowEncoded = startTimesToEncoded[windowRaw];
-origNotes = windowEncoded[[All, 4]];
-origNoteData = N[windowEncoded[[All, 1 ;; 3]]];
+{melodyRaw, harmonyRaw} = splitMelodyHarmonyByOnset[windowRaw, 0.03];
+If[Length[melodyRaw] < 8,
+  melodyRaw = windowRaw;
+  harmonyRaw = {}
+];
 
-Print["Window note count: ", Length[windowEncoded]];
+melodyEncoded = startTimesToEncoded[melodyRaw];
+origNotes = melodyEncoded[[All, 4]];
+origNoteData = N[melodyEncoded[[All, 1 ;; 3]]];
+
+Print["Window note count: ", Length[windowRaw], " (melody notes: ", Length[melodyRaw], ", harmony notes: ", Length[harmonyRaw], ")"];
 Print["Building per-bar key/chord timeline..."];
 
 beatSeconds = estimateBeatSeconds[windowRaw];
@@ -412,8 +443,12 @@ Do[
   AppendTo[rewriteData, newData];
 , {i, Length[rewriteNotes] + 1, Length[origNotes]}];
 
-reworkedEncoded = Transpose@{rewriteData[[All, 1]], rewriteData[[All, 2]], rewriteData[[All, 3]], rewriteNotes};
-reworkedNotes = HowlDecodeNotesV1[reworkedEncoded];
+reworkedMelodyEncoded = Transpose@{rewriteData[[All, 1]], rewriteData[[All, 2]], rewriteData[[All, 3]], rewriteNotes};
+reworkedMelodyRaw = sanitizeRawRows[encodedToStartTimes[reworkedMelodyEncoded]];
+combinedRaw = SortBy[Join[reworkedMelodyRaw, harmonyRaw], First];
+combinedRaw = applySwingToRaw[combinedRaw, beatSeconds, swingFrac];
+combinedEncoded = startTimesToEncoded[combinedRaw];
+reworkedNotes = HowlDecodeNotesV1[combinedEncoded];
 
 Export[outputMidi, Sound[reworkedNotes], "MIDI"];
 
@@ -426,10 +461,14 @@ analysis = <|
   "GlobalKey" -> globalKeyProfile["Name"],
   "PreferredChordCategories" -> preferredChordCategories,
   "ChordTemplateCategories" -> chordTemplateCategories,
-  "BarTimeline" -> timeline
+  "BarTimeline" -> timeline,
+  "HarmonyNoteCount" -> Length[harmonyRaw],
+  "MelodyNoteCount" -> Length[reworkedMelodyRaw],
+  "SwingFrac" -> swingFrac
 |>;
 
-Export[analysisJson, analysis, "JSON"];
+safeAnalysis = analysis /. {Missing[__] -> "None", DirectedInfinity[_] -> Null, Infinity -> Null, -Infinity -> Null};
+Export[analysisJson, safeAnalysis, "JSON"];
 
 Print["Saved rework MIDI: ", outputMidi];
 Print["Saved bar-by-bar key/chord analysis: ", analysisJson];
