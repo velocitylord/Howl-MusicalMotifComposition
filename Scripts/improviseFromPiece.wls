@@ -312,6 +312,56 @@ nearestAllowedPitch[candidatePitch_, originalPitch_, allowedPcs_] := Module[{oct
 ];
 
 
+splitMelodyHarmonyByOnset[rawRows_, tol_:0.03] := Module[{sorted, groups = {}, current = {}, melody = {}, harmony = {}, top},
+  sorted = SortBy[rawRows, First];
+  If[Length[sorted] == 0, Return[{ {}, {} }]];
+  current = {First[sorted]};
+  Do[
+    If[Abs[row[[1]] - current[[-1, 1]]] <= tol,
+      AppendTo[current, row],
+      AppendTo[groups, current];
+      current = {row}
+    ]
+  , {row, Rest[sorted]}];
+  AppendTo[groups, current];
+
+  Do[
+    top = Last@SortBy[g, #[[4]] &];
+    AppendTo[melody, top];
+    harmony = Join[harmony, DeleteCases[g, top]];
+  , {g, groups}];
+
+  {SortBy[melody, First], SortBy[harmony, First]}
+];
+
+
+activeMelodyPitchAtTime[t_, melodyRaw_] := Module[{active, nearest},
+  If[Length[melodyRaw] == 0, Return[Missing["None"]]];
+  active = Select[melodyRaw, #[[1]] <= t < (#[[1]] + #[[2]]) &];
+  If[Length[active] > 0, Return[Last@SortBy[active, #[[4]] &][[4]]]];
+  nearest = First@SortBy[melodyRaw, Abs[#[[1]] - t] &];
+  nearest[[4]]
+];
+
+reharmonizeHarmonyRaw[harmonyRows_, melodyRaw_, timeline_] := Module[{out = {}, barCtx, chordPcs, melodyPitch, allowedPcs, newPitch},
+  Do[
+    barCtx = activeChordAtTime[row[[1]], timeline];
+    chordPcs = If[AssociationQ[barCtx] && KeyExistsQ[barCtx, "PCs"], barCtx["PCs"], {}];
+    melodyPitch = activeMelodyPitchAtTime[row[[1]], melodyRaw];
+    allowedPcs = DeleteDuplicates@Join[chordPcs, If[NumericQ[melodyPitch], {Mod[melodyPitch, 12]}, {}]];
+    If[Length[allowedPcs] == 0,
+      newPitch = row[[4]],
+      newPitch = nearestAllowedPitch[row[[4]], row[[4]], allowedPcs];
+      If[NumericQ[melodyPitch] && newPitch >= melodyPitch - 1, newPitch = newPitch - 12];
+      newPitch = Clip[Round[newPitch], {-60, 59}]
+    ];
+    AppendTo[out, {row[[1]], row[[2]], row[[3]], newPitch}]
+  , {row, harmonyRows}];
+  out
+];
+
+
+
 buildChordVoicing[rootPc_, pcs_] := Module[{normalized, rel, orderedRel, picked, bass, mid, top},
   normalized = Sort[DeleteDuplicates[Mod[pcs, 12]]];
   If[Length[normalized] < 3,
@@ -371,11 +421,17 @@ windowRaw = SortBy[sanitizeRawRows[windowRawAbsolute], First];
 windowRaw[[All, 1]] = windowRaw[[All, 1]] - windowOffset;
 windowDuration = Max[windowRaw[[All, 1]] + windowRaw[[All, 2]]];
 
-windowEncoded = startTimesToEncoded[windowRaw];
-origNotes = windowEncoded[[All, 4]];
-origNoteData = N[windowEncoded[[All, 1 ;; 3]]];
+{melodyRaw, harmonyRaw} = splitMelodyHarmonyByOnset[windowRaw, 0.03];
+If[Length[melodyRaw] < 8,
+  melodyRaw = windowRaw;
+  harmonyRaw = {}
+];
 
-Print["Window note count: ", Length[windowEncoded]];
+melodyEncoded = startTimesToEncoded[melodyRaw];
+origNotes = melodyEncoded[[All, 4]];
+origNoteData = N[melodyEncoded[[All, 1 ;; 3]]];
+
+Print["Window note count: ", Length[windowRaw], " (melody notes: ", Length[melodyRaw], ", harmony notes: ", Length[harmonyRaw], ")"];
 Print["Building per-bar key/chord timeline..."];
 
 beatSeconds = estimateBeatSeconds[windowRaw];
@@ -433,6 +489,10 @@ Do[
   AppendTo[rewriteData, newData];
 , {i, Length[rewriteNotes] + 1, Length[origNotes]}];
 
+reworkedMelodyEncoded = Transpose@{rewriteData[[All, 1]], rewriteData[[All, 2]], rewriteData[[All, 3]], rewriteNotes};
+reworkedMelodyRaw = sanitizeRawRows[encodedToStartTimes[reworkedMelodyEncoded]];
+reworkedHarmonyRaw = reharmonizeHarmonyRaw[harmonyRaw, reworkedMelodyRaw, timeline];
+combinedRaw = SortBy[Join[reworkedMelodyRaw, reworkedHarmonyRaw], First];
 reworkedEncoded = Transpose@{rewriteData[[All, 1]], rewriteData[[All, 2]], rewriteData[[All, 3]], rewriteNotes};
 
 melodyRaw = sanitizeRawRows[encodedToStartTimes[reworkedEncoded]];
@@ -453,6 +513,8 @@ analysis = <|
   "PreferredChordCategories" -> preferredChordCategories,
   "ChordTemplateCategories" -> chordTemplateCategories,
   "BarTimeline" -> timeline,
+  "HarmonyNoteCount" -> Length[reworkedHarmonyRaw],
+  "MelodyNoteCount" -> Length[reworkedMelodyRaw]
   "AccompanimentNoteCount" -> Length[chordBackingRaw],
   "MelodyNoteCount" -> Length[melodyRaw]
 |>;
