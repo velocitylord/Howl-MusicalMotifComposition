@@ -2,13 +2,14 @@
 
 (* Usage:
    wolframscript -file Scripts/improviseFromPiece.wls \
-     <predictorFile> <datasetFile> <pieceQuery> <startSec> <endSec> [outputMidi] [maxPitchDelta] [maxTimingFrac] [keepOriginalProb] [analysisJson]
+     <predictorFile> <datasetFile> <pieceQuery> <startSec> <endSec> [outputMidi] [maxPitchDelta] [maxTimingFrac] [keepOriginalProb] [analysisJson] [swingFrac]
 
    outputMidi (optional): output path, default "Scripts/rework.mid"
    maxPitchDelta (optional): max semitone deviation per note, default 2
    maxTimingFrac (optional): max relative timing/duration deviation, default 0.12
    keepOriginalProb (optional): probability to keep each original note unchanged, default 0.35
    analysisJson (optional): save bar-by-bar key/chord analysis, default "Scripts/rework_analysis.json"
+   swingFrac (optional): amount of off-beat swing in [0,0.35], default 0.0
 *)
 
 repoRoot = DirectoryName[DirectoryName[ExpandFileName[First[$ScriptCommandLine]]]];
@@ -16,7 +17,7 @@ SetDirectory[repoRoot];
 
 If[Length[$ScriptCommandLine] < 6,
   Print[
-    "Usage: wolframscript -file Scripts/improviseFromPiece.wls <predictorFile> <datasetFile> <pieceQuery> <startSec> <endSec> [outputMidi] [maxPitchDelta] [maxTimingFrac] [keepOriginalProb] [analysisJson]"
+    "Usage: wolframscript -file Scripts/improviseFromPiece.wls <predictorFile> <datasetFile> <pieceQuery> <startSec> <endSec> [outputMidi] [maxPitchDelta] [maxTimingFrac] [keepOriginalProb] [analysisJson] [swingFrac]"
   ];
   Exit[1];
 ];
@@ -31,6 +32,7 @@ maxPitchDelta = If[Length[$ScriptCommandLine] >= 8, Interpreter["Integer"][$Scri
 maxTimingFrac = If[Length[$ScriptCommandLine] >= 9, Interpreter["Number"][$ScriptCommandLine[[9]]], 0.12];
 keepOriginalProb = If[Length[$ScriptCommandLine] >= 10, Interpreter["Number"][$ScriptCommandLine[[10]]], 0.35];
 analysisJson = If[Length[$ScriptCommandLine] >= 11, $ScriptCommandLine[[11]], "Scripts/rework_analysis.json"];
+swingFrac = If[Length[$ScriptCommandLine] >= 12, Interpreter["Number"][$ScriptCommandLine[[12]]], 0.0];
 
 If[FailureQ[startSec] || FailureQ[endSec] || endSec <= startSec,
   Print["Invalid timestamp range. Example: 4 25"]; Exit[1];
@@ -46,6 +48,10 @@ If[FailureQ[maxTimingFrac] || maxTimingFrac < 0 || maxTimingFrac > 0.8,
 
 If[FailureQ[keepOriginalProb] || keepOriginalProb < 0 || keepOriginalProb > 1,
   Print["keepOriginalProb must be in [0, 1]."]; Exit[1];
+];
+
+If[FailureQ[swingFrac] || swingFrac < 0 || swingFrac > 0.35,
+  Print["swingFrac must be in [0, 0.35]."]; Exit[1];
 ];
 
 Get["Howl/HowlMidiTools.wl"];
@@ -335,6 +341,20 @@ splitMelodyHarmonyByOnset[rawRows_, tol_:0.03] := Module[{sorted, groups = {}, c
 ];
 
 
+applySwingToRaw[rawRows_, beatSec_, swingAmount_] := Module[{shift, swung},
+  If[swingAmount <= 0 || beatSec <= 0 || Length[rawRows] == 0, Return[rawRows]];
+  shift = swingAmount*0.25*beatSec;
+  swung = Map[
+    Function[r,
+      Module[{st = r[[1]], phase, newStart},
+        phase = Mod[st, beatSec]/beatSec;
+        newStart = If[phase >= 0.45 && phase <= 0.95, st + shift, st];
+        {Max[0, newStart], r[[2]], r[[3]], r[[4]]}
+      ]
+    ],
+    rawRows
+  ];
+  SortBy[swung, First]
 activeMelodyPitchAtTime[t_, melodyRaw_] := Module[{active, nearest},
   If[Length[melodyRaw] == 0, Return[Missing["None"]]];
   active = Select[melodyRaw, #[[1]] <= t < (#[[1]] + #[[2]]) &];
@@ -431,6 +451,11 @@ melodyEncoded = startTimesToEncoded[melodyRaw];
 origNotes = melodyEncoded[[All, 4]];
 origNoteData = N[melodyEncoded[[All, 1 ;; 3]]];
 
+
+melodyEncoded = startTimesToEncoded[melodyRaw];
+origNotes = melodyEncoded[[All, 4]];
+origNoteData = N[melodyEncoded[[All, 1 ;; 3]]];
+
 Print["Window note count: ", Length[windowRaw], " (melody notes: ", Length[melodyRaw], ", harmony notes: ", Length[harmonyRaw], ")"];
 Print["Building per-bar key/chord timeline..."];
 
@@ -491,6 +516,8 @@ Do[
 
 reworkedMelodyEncoded = Transpose@{rewriteData[[All, 1]], rewriteData[[All, 2]], rewriteData[[All, 3]], rewriteNotes};
 reworkedMelodyRaw = sanitizeRawRows[encodedToStartTimes[reworkedMelodyEncoded]];
+combinedRaw = SortBy[Join[reworkedMelodyRaw, harmonyRaw], First];
+combinedRaw = applySwingToRaw[combinedRaw, beatSeconds, swingFrac];
 reworkedHarmonyRaw = reharmonizeHarmonyRaw[harmonyRaw, reworkedMelodyRaw, timeline];
 combinedRaw = SortBy[Join[reworkedMelodyRaw, reworkedHarmonyRaw], First];
 reworkedEncoded = Transpose@{rewriteData[[All, 1]], rewriteData[[All, 2]], rewriteData[[All, 3]], rewriteNotes};
@@ -513,6 +540,9 @@ analysis = <|
   "PreferredChordCategories" -> preferredChordCategories,
   "ChordTemplateCategories" -> chordTemplateCategories,
   "BarTimeline" -> timeline,
+  "HarmonyNoteCount" -> Length[harmonyRaw],
+  "MelodyNoteCount" -> Length[reworkedMelodyRaw],
+  "SwingFrac" -> swingFrac
   "HarmonyNoteCount" -> Length[reworkedHarmonyRaw],
   "MelodyNoteCount" -> Length[reworkedMelodyRaw]
   "AccompanimentNoteCount" -> Length[chordBackingRaw],

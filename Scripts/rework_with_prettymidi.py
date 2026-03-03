@@ -92,6 +92,7 @@ def run_rework(args: argparse.Namespace) -> tuple[Path | None, str]:
         str(args.max_timing_frac),
         str(args.keep_original_prob),
         args.wolfram_analysis_json,
+        str(args.swing_frac),
     ]
 
     proc = subprocess.run(cmd, text=True, capture_output=True)
@@ -120,6 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--keep-original-prob", type=float, default=0.35)
     p.add_argument("--wolfram-analysis-json", default="Scripts/rework_analysis.json")
     p.add_argument("--combined-analysis-json", default="Scripts/rework_pretty_analysis.json")
+    p.add_argument("--swing-frac", type=float, default=0.0)
     return p
 
 
@@ -144,6 +146,7 @@ def main() -> int:
             "start_sec": args.start_sec,
             "end_sec": args.end_sec,
             "output_midi": args.output_midi,
+            "swing_frac": args.swing_frac,
         },
         "wolfram_log": wolfram_log,
         "source_piece_analysis": source_analysis,
