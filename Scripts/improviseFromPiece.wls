@@ -15,6 +15,10 @@
 repoRoot = DirectoryName[DirectoryName[ExpandFileName[First[$ScriptCommandLine]]]];
 SetDirectory[repoRoot];
 
+(* Suppress known parser-noise warnings from Wolfram internals on some MIDI metadata. *)
+Quiet[Off[ToExpression::sntx]];
+Quiet[Off[ToExpression::sntxi]];
+
 If[Length[$ScriptCommandLine] < 6,
   Print[
     "Usage: wolframscript -file Scripts/improviseFromPiece.wls <predictorFile> <datasetFile> <pieceQuery> <startSec> <endSec> [outputMidi] [maxPitchDelta] [maxTimingFrac] [keepOriginalProb] [analysisJson] [swingFrac]"
