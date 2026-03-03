@@ -120,11 +120,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--wolfram-analysis-json", default="Scripts/reinterpreted_phrase_analysis.json")
     p.add_argument("--combined-analysis-json", default="Scripts/reinterpreted_phrase_pretty_analysis.json")
     p.add_argument("--timing-blend", type=float, default=0.10)
-    p.add_argument("--max-pitch-delta", type=int, default=5)
-    p.add_argument("--keep-original-prob", type=float, default=0.20)
-    p.add_argument("--wolfram-analysis-json", default="Scripts/reinterpreted_phrase_analysis.json")
-    p.add_argument("--combined-analysis-json", default="Scripts/reinterpreted_phrase_pretty_analysis.json")
-    p.add_argument("--timing-blend", type=float, default=0.30)
     return p
 
 

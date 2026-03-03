@@ -109,8 +109,13 @@ This keeps generation close to the original training/predictor pipeline and is u
 - keeps original harmony notes, and exports MIDI + analysis JSON.
 
 ```bash
-wolframscript -file Scripts/reinterpretPhraseWithHarmony.wls   Scripts/checkpoints_xxxx/predictor_yyyy.wlnet   Scripts/dataset.wxf   "Ashitaka"   4 25   Scripts/ashitaka_reinterpreted.mid   Scripts/ashitaka_reinterpreted_analysis.json   2   0.65   0.10
-wolframscript -file Scripts/reinterpretPhraseWithHarmony.wls   Scripts/checkpoints_xxxx/predictor_yyyy.wlnet   Scripts/dataset.wxf   "Ashitaka"   4 25   Scripts/ashitaka_reinterpreted.mid   Scripts/ashitaka_reinterpreted_analysis.json   5   0.20   0.30
+wolframscript -file Scripts/reinterpretPhraseWithHarmony.wls \
+  Scripts/checkpoints_xxxx/predictor_yyyy.wlnet \
+  Scripts/dataset.wxf \
+  "Ashitaka" 4 25 \
+  Scripts/ashitaka_reinterpreted.mid \
+  Scripts/ashitaka_reinterpreted_analysis.json \
+  2 0.65 0.10
 ```
 
 Arguments:
@@ -137,9 +142,38 @@ In practice, start with the **safest** setting and only increase variation if it
 ### Can the predictor choose chord progressions?
 
 Not directly in this project. The predictor is used here as a **next-note/melodic suggestion** model; it was not trained as a dedicated chord-progression planner. This workflow therefore keeps harmony grounded by detecting key/chords from the selected phrase and constraining melody edits to that context.
-7. `maxPitchDelta` (optional): max semitone shift from each original melody pitch (default `5`)
-8. `keepOriginalProb` (optional): probability each melody note stays original (default `0.20`)
-9. `timingBlend` (optional): blend factor between original and predicted delay/duration/volume (default `0.30`)
+
+
+## Key-shift + regenerate melody workflow (new)
+
+Use `Scripts/keyShiftAndRegenerateMelody.wls` when you need a stronger demo in a specific key:
+
+- detects key/chords from the original phrase,
+- transposes the phrase to your target key,
+- keeps harmony untouched except for key shift,
+- regenerates melody with predictor guidance under chord+key constraints.
+
+```bash
+wolframscript -file Scripts/keyShiftAndRegenerateMelody.wls \
+  Scripts/checkpoints_xxxx/predictor_yyyy.wlnet \
+  Scripts/dataset.wxf \
+  "Ashitaka" 4 25 "D minor" \
+  Scripts/ashitaka_dminor_regen.mid \
+  Scripts/ashitaka_dminor_regen_analysis.json \
+  3 0.10
+```
+
+Arguments:
+
+1. `predictorFile`
+2. `datasetFile`
+3. `pieceQuery`
+4. `startSec endSec`
+5. `targetKey` (format: `"Root mode"`, e.g. `"F# minor"`, `"Bb major"`)
+6. `outputMidi` (optional)
+7. `analysisJson` (optional)
+8. `maxPitchDelta` (optional, default `3`)
+9. `timingBlend` (optional, default `0.10`)
 
 ### Troubleshooting
 
